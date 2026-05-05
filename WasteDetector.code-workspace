@@ -1,0 +1,24 @@
+{
+	"folders": [
+		{
+			"name": "Raspberry PI",
+			"path": "Raspberry PI"
+		},
+		{
+			"name": "WasteDetector_ESP32",
+			"path": "WasteDetector_ESP32"
+		},
+		{
+			"name": "--- ROOT FILES ---",
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.exclude": {
+			"WasteDetector_ESP32": true,
+			"Raspberry PI": true,
+			".pio": true,
+			".vscode": true
+		}
+	}
+}
