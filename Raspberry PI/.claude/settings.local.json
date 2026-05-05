@@ -4,7 +4,11 @@
       "Bash(Get-ChildItem -Recurse \"d:\\\\Projects\\\\WasteDetector\" -File)",
       "Bash(Select-Object FullName)",
       "Bash(Sort-Object FullName)",
-      "PowerShell(Get-ChildItem -Recurse \"d:\\\\Projects\\\\WasteDetector\" -File | ForEach-Object { $_.FullName })"
+      "PowerShell(Get-ChildItem -Recurse \"d:\\\\Projects\\\\WasteDetector\" -File | ForEach-Object { $_.FullName })",
+      "Bash(Remove-Item \"d:\\\\Projects\\\\WasteDetector\\\\Raspberry PI\\\\pi_camera_detector.py\" -Force)"
+    ],
+    "additionalDirectories": [
+      "d:\\Projects\\WasteDetector\\Raspberry PI"
     ]
   }
 }

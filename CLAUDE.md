@@ -5,7 +5,7 @@
 Hệ thống tự động phân loại rác thành 4 loại: Nhựa, Thủy tinh, Giấy, Kim loại.
 
 **Lớp 1 — SBC: Raspberry Pi 4**
-- Xử lý AI/Vision (OpenCV + TFLite)
+- Xử lý AI/Vision (OpenCV + TFLite) — **chỉ phân loại LOẠI vật**, không phát hiện sự hiện diện
 - Phân tích FFT âm thanh (NumPy/SciPy)
 - Ra quyết định phân loại, điều phối toàn hệ thống
 - Giao tiếp xuống ESP32: **UART Serial2 — JSON — 115200 baud**
@@ -26,8 +26,8 @@ Hệ thống tự động phân loại rác thành 4 loại: Nhựa, Thủy tinh
 | SBC | Raspberry Pi 4 | Xử lý AI, FFT, điều phối |
 | MCU | ESP32 Dev Module | Điều khiển cơ cấu, cảm biến |
 | Mic âm thanh | INMP441 | Thu âm I2S → FFT phân tích vật liệu |
-| Camera | Pi Camera | Chụp ảnh → AI phân loại |
-| Cảm biến khoảng cách | HC-SR04 | Phát hiện vật thể rơi vào ống |
+| Camera | Pi Camera | Chụp ảnh → AI phân loại LOẠI vật (không dùng để detect) |
+| Cảm biến khoảng cách | HC-SR04 | **Duy nhất** phát hiện vật thể rơi vào ống |
 | Cảm biến IR | 4× TCRT5000 | Định vị góc xoay ống (4 vị trí) |
 | Servo gõ | SG90 | Gõ vật thể tạo âm thanh |
 | Servo cửa | MG90S | Mở/đóng cửa trượt đáy ống |
@@ -216,8 +216,7 @@ WasteDetector/
     ├── main_controller.py                 (bộ não: điều phối toàn bộ flow)
     ├── pi_config.py                       (hằng số toàn hệ thống)
     ├── pi_audio_classifier.py             (thu âm INMP441 → FFT → phân loại)
-    ├── pi_camera_detector.py              (motion detection: phát hiện CÓ vật không)
-    ├── pi_camera_classifier.py            (AI/OpenCV: phân loại LOẠI vật từ ảnh)
+    ├── pi_camera_classifier.py            (AI/OpenCV: phân loại LOẠI vật từ ảnh — KHÔNG dùng để detect)
     ├── pi_classifier_fusion.py            (kết hợp audio + camera → quyết định cuối)
     ├── pi_communication.py                (UART JSON với ESP32)
     ├── pi_gui_display.py                  (Tkinter fullscreen HDMI)
