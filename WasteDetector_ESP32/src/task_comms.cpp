@@ -37,6 +37,18 @@ static void sendEventInt(const char* event, const char* key, int value) {
     UART_PI.print('\n');
 }
 
+// Serialize Response_t từ responseQueue → UART Pi
+static void sendResponse(const Response_t& resp) {
+    JsonDocument doc;
+    doc["event"] = resp.event;
+    if (strcmp(resp.event, "KNOCK_DONE") == 0)
+        doc["seq"]      = resp.param;
+    else if (strcmp(resp.event, "ROTATE_DONE") == 0)
+        doc["position"] = resp.param;
+    serializeJson(doc, UART_PI);
+    UART_PI.print('\n');
+}
+
 // ── taskComms — Core 0, Priority 1 ───────────────────────────
 void taskComms(void* pvParameters) {
     pinMode(PIN_ULTRASONIC_TRIG, OUTPUT);
@@ -84,19 +96,19 @@ void taskComms(void* pvParameters) {
                     Command_t msg;
                     strlcpy(msg.cmd, "KNOCK", sizeof(msg.cmd));
                     msg.param = doc["count"] | 1;
-                    xQueueSend(commandQueue, &msg, 0);
+                    xQueueSend(commandQueue, &msg, pdMS_TO_TICKS(10));
 
                 } else if (strcmp(cmd, "ROTATE") == 0) {
                     Command_t msg;
                     strlcpy(msg.cmd, "ROTATE", sizeof(msg.cmd));
                     msg.param = doc["target"] | WASTE_NONE;
-                    xQueueSend(commandQueue, &msg, 0);
+                    xQueueSend(commandQueue, &msg, pdMS_TO_TICKS(10));
 
                 } else if (strcmp(cmd, "DISCHARGE") == 0) {
                     Command_t msg;
                     strlcpy(msg.cmd, "DISCHARGE", sizeof(msg.cmd));
                     msg.param = 0;
-                    xQueueSend(commandQueue, &msg, 0);
+                    xQueueSend(commandQueue, &msg, pdMS_TO_TICKS(10));
 
                 } else if (strcmp(cmd, "LIGHT") == 0) {
                     // Relay điều khiển trực tiếp — không cần queue
@@ -115,6 +127,12 @@ void taskComms(void* pvParameters) {
                 if (inputBuffer.length() < 256)
                     inputBuffer += ch;
             }
+        }
+
+        // ── Forward responses từ taskRealtime về Pi ──────────────
+        Response_t resp;
+        while (xQueueReceive(responseQueue, &resp, 0) == pdTRUE) {
+            sendResponse(resp);
         }
 
         vTaskDelay(pdMS_TO_TICKS(ULTRASONIC_POLL_MS));

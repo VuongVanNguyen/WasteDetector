@@ -46,13 +46,16 @@
 // ============================================================
 // Timing constants (ms) — calibrate with real hardware
 // ============================================================
-#define KNOCK_INTERVAL_MS       500     // delay between knocks
-#define KNOCK_STRIKE_ANGLE      90      // SG90 strike angle (deg from rest)
-#define KNOCK_REST_ANGLE        0
+#define KNOCK_INTERVAL_MS       500     // period between knock starts (ms)
+#define KNOCK_STRIKE_ANGLE      90      // SG90 strike angle (deg)
+#define KNOCK_REST_ANGLE        0       // SG90 rest angle (deg)
+#define KNOCK_DWELL_MS          150     // time held at strike position
+#define KNOCK_SETTLE_MS         100     // time for servo to return to rest
 
-#define DOOR_OPEN_ANGLE         90      // MG90S open angle
-#define DOOR_CLOSE_ANGLE        0
-#define DOOR_HOLD_MS            1500    // how long to hold door open
+#define DOOR_OPEN_ANGLE         90      // MG90S open angle (deg)
+#define DOOR_CLOSE_ANGLE        0       // MG90S closed angle (deg)
+#define DOOR_HOLD_MS            1500    // how long door stays open
+#define DOOR_SETTLE_MS          500     // settle time after door closes
 
 #define MOTOR_SPEED             180     // L298N ENA PWM 0-255 — calibrate
 #define MOTOR_TIMEOUT_MS        5000    // max rotation time before error
@@ -63,6 +66,7 @@
 #define IR_THRESHOLD            500     // ADC value — calibrate with reflector
 
 // ============================================================
-// FreeRTOS queue
+// FreeRTOS queues
 // ============================================================
-#define CMD_QUEUE_SIZE  8
+#define CMD_QUEUE_SIZE      8
+#define RESPONSE_QUEUE_SIZE 8
