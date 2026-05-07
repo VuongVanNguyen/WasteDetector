@@ -16,7 +16,6 @@
 static Servo servoKnock;
 static Servo servoDoor;
 
-// ---- helper: push response về taskComms (non-blocking) ----
 static inline void pushResponse(const char* event, int param) {
     Response_t resp = {};
     strncpy(resp.event, event, sizeof(resp.event) - 1);
@@ -24,13 +23,6 @@ static inline void pushResponse(const char* event, int param) {
     xQueueSend(responseQueue, &resp, pdMS_TO_TICKS(10));
 }
 
-// ============================================================
-// doKnock — SG90 gõ 'count' lần
-//   Mỗi lần: strike → KNOCK_DWELL_MS → rest → KNOCK_SETTLE_MS
-//   Sau mỗi lần push KNOCK_DONE{seq=i}
-//   Khoảng cách giữa các lần gõ đúng bằng KNOCK_INTERVAL_MS (tính từ
-//   đầu lần gõ đến đầu lần gõ tiếp theo).
-// ============================================================
 static void doKnock(int count) {
     const TickType_t period = pdMS_TO_TICKS(KNOCK_INTERVAL_MS);
 
@@ -55,10 +47,6 @@ static void doKnock(int count) {
     }
 }
 
-// ============================================================
-// doDischarge — MG90S mở cửa trượt, giữ, đóng
-//   Sau khi cửa đóng và ổn định, push DISCHARGE_DONE.
-// ============================================================
 static void doDischarge() {
     servoDoor.write(DOOR_OPEN_ANGLE);
     vTaskDelay(pdMS_TO_TICKS(DOOR_HOLD_MS));
@@ -69,20 +57,36 @@ static void doDischarge() {
     pushResponse("DISCHARGE_DONE", 0);
 }
 
-// ============================================================
-// taskRealtime entry point
-// ============================================================
+static void motorRotate(uint8_t speed) {
+    digitalWrite(PIN_MOTOR_IN1, HIGH);
+    digitalWrite(PIN_MOTOR_IN2, LOW);
+    ledcWrite(MOTOR_LEDC_CHANNEL, speed);
+} 
+
+static void motorStop() {
+    digitalWrite(PIN_MOTOR_IN1, HIGH);
+    digitalWrite(PIN_MOTOR_IN2, HIGH);
+    ledcWrite(MOTOR_LEDC_CHANNEL, 0);
+}
+
+static void doRotate() {
+
+}
+
 void taskRealtime(void* pvParameters) {
-    // Cấp phát hardware timer cho LEDC (2 servo → 2 timer)
     ESP32PWM::allocateTimer(0);
     ESP32PWM::allocateTimer(1);
 
-    // SG90 — gõ vật thể
+    pinMode(PIN_MOTOR_IN1, OUTPUT);
+    pinMode(PIN_MOTOR_IN2, OUTPUT);
+    ledcSetup(MOTOR_LEDC_CHANNEL, MOTOR_LEDC_FREQ, MOTOR_LEDC_BITS);
+    ledcAttachPin(PIN_MOTOR_ENA, MOTOR_LEDC_CHANNEL);
+    motorStop();
+
     servoKnock.setPeriodHertz(50);
     servoKnock.attach(PIN_SERVO_KNOCK, 500, 2400);
     servoKnock.write(KNOCK_REST_ANGLE);
 
-    // MG90S — cửa trượt đáy ống
     servoDoor.setPeriodHertz(50);
     servoDoor.attach(PIN_SERVO_DOOR, 500, 2400);
     servoDoor.write(DOOR_CLOSE_ANGLE);

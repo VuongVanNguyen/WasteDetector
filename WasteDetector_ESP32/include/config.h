@@ -59,6 +59,10 @@
 
 #define MOTOR_SPEED             180     // L298N ENA PWM 0-255 — calibrate
 #define MOTOR_TIMEOUT_MS        5000    // max rotation time before error
+#define MOTOR_ROTATE_MS         80     // estimated time to rotate waste into bin
+#define MOTOR_LEDC_CHANNEL      4       // LEDC Channel for motor PWM
+#define MOTOR_LEDC_FREQ         5000    // PWM frequency for motor control (Hz)
+#define MOTOR_LEDC_BITS         8       // PWM resolution for motor control (bits)
 
 #define ULTRASONIC_DETECT_CM    17      // object present if distance < this
 #define ULTRASONIC_POLL_MS      100     // HC-SR04 poll interval

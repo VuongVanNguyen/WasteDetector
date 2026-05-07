@@ -1,8 +1,13 @@
 // Standalone servo test — SG90 (knock) + MG90S (door)
 // Flash với: pio run -e test_servo --target upload
-// Quan sat:  pio device monitor -e test_servo
+// Quan sát:  pio device monitor -e test_servo
 //
-// Điều chỉnh các góc/thời gian trong config.h nếu cần, sau đó flash lại.
+// Lệnh Serial:
+//   'k' → test knock (3 lần)
+//   'd' → test door (mở/đóng)
+//   'a' → test cả 2 tuần tự với delay 10s giữa (mô phỏng workflow)
+//
+// Điều chỉnh các góc/thời gian trong config.h, sau đó flash lại.
 
 #include <Arduino.h>
 #include <ESP32Servo.h>
@@ -41,6 +46,10 @@ static void testDoor() {
     Serial.println("[DOOR] Xong.");
 }
 
+static void printMenu() {
+    Serial.println("\n--- Lệnh: 'k'=knock | 'd'=door | 'a'=cả 2 ---");
+}
+
 void setup() {
     Serial.begin(115200);
     delay(500);
@@ -62,14 +71,38 @@ void setup() {
     servoDoor.write(DOOR_CLOSE_ANGLE);
 
     delay(1000);  // cho servo về vị trí ban đầu
+    printMenu();
 }
 
 void loop() {
-    Serial.println("\n--- Chu kỳ test mới ---");
+    if (!Serial.available()) return;
 
-    testKnock(3);
-    delay(1000);
+    char cmd = Serial.read();
+    // Bỏ qua newline/carriage return
+    if (cmd == '\n' || cmd == '\r') return;
 
-    testDoor();
-    delay(2000);
+    switch (cmd) {
+        case 'k':
+            testKnock(3);
+            break;
+
+        case 'd':
+            testDoor();
+            break;
+
+        case 'a':
+            Serial.println("[AUTO] Knock → chờ 10s (mô phỏng AI+xoay) → Door");
+            testKnock(3);
+            Serial.println("[AUTO] Chờ 10s...");
+            delay(10000);
+            testDoor();
+            Serial.println("[AUTO] Xong.");
+            break;
+
+        default:
+            Serial.printf("[?] Lệnh '%c' không hợp lệ.\n", cmd);
+            break;
+    }
+
+    printMenu();
 }
