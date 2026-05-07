@@ -9,6 +9,7 @@ static int measureDistanceCm() {
     digitalWrite(PIN_ULTRASONIC_TRIG, LOW);
 
     long duration = pulseIn(PIN_ULTRASONIC_ECHO, HIGH, 30000);
+    Serial.printf("[RAW] duration=%ld us\n", duration);
     if (duration == 0) return -1;
     return (int)(duration * 0.0343f / 2.0f);
 }

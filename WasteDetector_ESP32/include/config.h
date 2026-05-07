@@ -60,7 +60,7 @@
 #define MOTOR_SPEED             180     // L298N ENA PWM 0-255 — calibrate
 #define MOTOR_TIMEOUT_MS        5000    // max rotation time before error
 
-#define ULTRASONIC_DETECT_CM    20      // object present if distance < this
+#define ULTRASONIC_DETECT_CM    17      // object present if distance < this
 #define ULTRASONIC_POLL_MS      100     // HC-SR04 poll interval
 
 #define IR_THRESHOLD            500     // ADC value — calibrate with reflector
