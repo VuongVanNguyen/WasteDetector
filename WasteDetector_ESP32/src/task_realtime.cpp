@@ -3,18 +3,11 @@
 #include "config.h"
 #include "tasks.h"
 
-// ============================================================
-// taskRealtime — Core 1, Priority 2
-// Nhận lệnh từ commandQueue, điều khiển:
-//   - Servo SG90  (gõ vật thể)        → PIN_SERVO_KNOCK
-//   - Servo MG90S (mở/đóng cửa đáy)   → PIN_SERVO_DOOR
-//   - Motor GA25-370 via L298N (xoay)  → TODO
-//   - TCRT5000 IR  (xác nhận vị trí)   → TODO
-// Kết quả được đẩy vào responseQueue → taskComms gửi về Pi.
-// ============================================================
-
 static Servo servoKnock;
 static Servo servoDoor;
+static volatile bool irTriggered = false;
+static volatile int irPosition = WASTE_NONE; 
+static int currentPosition = WASTE_NONE;
 
 static inline void pushResponse(const char* event, int param) {
     Response_t resp = {};
@@ -37,7 +30,6 @@ static void doKnock(int count) {
 
         pushResponse("KNOCK_DONE", i);
 
-        // Giữ đúng chu kỳ KNOCK_INTERVAL_MS giữa các lần gõ
         if (i < count) {
             TickType_t elapsed = xTaskGetTickCount() - t0;
             if (elapsed < period) {
@@ -69,8 +61,42 @@ static void motorStop() {
     ledcWrite(MOTOR_LEDC_CHANNEL, 0);
 }
 
-static void doRotate() {
+void IRAM_ATTR irPLASTIC() { irTriggered = true; irPosition = WASTE_PLASTIC; }
+void IRAM_ATTR irGLASS()   { irTriggered = true; irPosition = WASTE_GLASS; }
+void IRAM_ATTR irPAPER()   { irTriggered = true; irPosition = WASTE_PAPER; }
+void IRAM_ATTR irMETAL()   { irTriggered = true; irPosition = WASTE_METAL; }
 
+static void doRotate(int target) {
+    if (target < WASTE_PLASTIC || target > WASTE_METAL) {
+        pushResponse("ERROR", 0);
+        return;
+    }
+    if (target == currentPosition) {
+        pushResponse("ROTATE_DONE", target);
+        return;
+    }
+
+    irTriggered = false;
+    irPosition = WASTE_NONE;
+    motorRotate(MOTOR_SPEED);
+    TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(MOTOR_TIMEOUT_MS);
+
+    while (xTaskGetTickCount() < deadline) {
+        if (irTriggered) {
+            int pos = irPosition;
+            irTriggered = false;
+            if (pos == target) {
+                motorStop();
+                currentPosition = pos;
+                vTaskDelay(pdMS_TO_TICKS(MOTOR_ROTATE_MS));
+                pushResponse("ROTATE_DONE", pos);
+                return;
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+    motorStop();
+    pushResponse("ERROR", 0);
 }
 
 void taskRealtime(void* pvParameters) {
@@ -82,6 +108,15 @@ void taskRealtime(void* pvParameters) {
     ledcSetup(MOTOR_LEDC_CHANNEL, MOTOR_LEDC_FREQ, MOTOR_LEDC_BITS);
     ledcAttachPin(PIN_MOTOR_ENA, MOTOR_LEDC_CHANNEL);
     motorStop();
+
+    pinMode(PIN_IR_PLASTIC, INPUT);
+    pinMode(PIN_IR_GLASS, INPUT);
+    pinMode(PIN_IR_PAPER, INPUT);
+    pinMode(PIN_IR_METAL, INPUT);
+    attachInterrupt(digitalPinToInterrupt(PIN_IR_PLASTIC), irPLASTIC, FALLING);
+    attachInterrupt(digitalPinToInterrupt(PIN_IR_GLASS), irGLASS, FALLING);
+    attachInterrupt(digitalPinToInterrupt(PIN_IR_PAPER), irPAPER, FALLING);
+    attachInterrupt(digitalPinToInterrupt(PIN_IR_METAL), irMETAL, FALLING);
 
     servoKnock.setPeriodHertz(50);
     servoKnock.attach(PIN_SERVO_KNOCK, 500, 2400);
@@ -97,7 +132,7 @@ void taskRealtime(void* pvParameters) {
             if (strcmp(cmd.cmd, "KNOCK") == 0) {
                 doKnock(cmd.param);
             } else if (strcmp(cmd.cmd, "ROTATE") == 0) {
-                // TODO: motor + IR interrupt logic
+                doRotate(cmd.param);
             } else if (strcmp(cmd.cmd, "DISCHARGE") == 0) {
                 doDischarge();
             }
