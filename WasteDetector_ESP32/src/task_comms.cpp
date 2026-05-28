@@ -37,6 +37,8 @@ static void sendResponse(const Response_t& resp) {
         doc["seq"]      = resp.param;
     else if (strcmp(resp.event, "ROTATE_DONE") == 0)
         doc["position"] = resp.param;
+    else if (strcmp(resp.event, "ERROR") == 0)
+        doc["code"]     = (resp.param == 1) ? "INVALID_CMD" : "MOTOR_TIMEOUT";
     serializeJson(doc, UART_PI);
     UART_PI.print('\n');
 }

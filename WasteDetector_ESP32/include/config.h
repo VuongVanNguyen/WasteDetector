@@ -52,8 +52,8 @@
 #define KNOCK_DWELL_MS          150     // time held at strike position
 #define KNOCK_SETTLE_MS         100     // time for servo to return to rest
 
-#define DOOR_OPEN_ANGLE         90      // MG90S open angle (deg)
-#define DOOR_CLOSE_ANGLE        0       // MG90S closed angle (deg)
+#define DOOR_OPEN_ANGLE         0       // MG90S open angle (deg) — inverted mount
+#define DOOR_CLOSE_ANGLE        90      // MG90S closed angle (deg) — inverted mount
 #define DOOR_HOLD_MS            1500    // how long door stays open
 #define DOOR_SETTLE_MS          500     // settle time after door closes
 

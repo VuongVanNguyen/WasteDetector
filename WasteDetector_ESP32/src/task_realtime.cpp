@@ -68,7 +68,7 @@ void IRAM_ATTR irMETAL()   { irTriggered = true; irPosition = WASTE_METAL; }
 
 static void doRotate(int target) {
     if (target < WASTE_PLASTIC || target > WASTE_METAL) {
-        pushResponse("ERROR", 0);
+        pushResponse("ERROR", 1);   // 1 = INVALID_CMD
         return;
     }
     if (target == currentPosition) {

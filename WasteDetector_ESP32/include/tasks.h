@@ -16,7 +16,7 @@ typedef struct {
 // ============================================================
 typedef struct {
     char event[20]; // "KNOCK_DONE", "ROTATE_DONE", "DISCHARGE_DONE", "ERROR"
-    int  param;     // KNOCK_DONE: seq | ROTATE_DONE: position | others: 0
+    int  param;     // KNOCK_DONE: seq | ROTATE_DONE: position | ERROR: 0=MOTOR_TIMEOUT, 1=INVALID_CMD | others: 0
 } Response_t;
 
 extern QueueHandle_t commandQueue;
