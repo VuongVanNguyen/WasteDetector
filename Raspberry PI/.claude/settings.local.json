@@ -5,7 +5,17 @@
       "Bash(Select-Object FullName)",
       "Bash(Sort-Object FullName)",
       "PowerShell(Get-ChildItem -Recurse \"d:\\\\Projects\\\\WasteDetector\" -File | ForEach-Object { $_.FullName })",
-      "Bash(Remove-Item \"d:\\\\Projects\\\\WasteDetector\\\\Raspberry PI\\\\pi_camera_detector.py\" -Force)"
+      "Bash(Remove-Item \"d:\\\\Projects\\\\WasteDetector\\\\Raspberry PI\\\\pi_camera_detector.py\" -Force)",
+      "Bash(pio pkg *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(p\\) for p in d.get\\('includes',{}\\).get\\('toolchain',[]\\) if 'espressif' in p.lower\\(\\) or 'arduino' in p.lower\\(\\)]\")",
+      "PowerShell($json = Get-Content \"d:\\\\Projects\\\\WasteDetector\\\\WasteDetector_ESP32\\\\.pio\\\\build\\\\esp32dev\\\\idedata.json\" | ConvertFrom-Json; $json.includes.toolchain | Where-Object { $_ -match \"espressif|arduino-esp32\" } | Select-Object -First 5)",
+      "PowerShell($json = Get-Content \"d:\\\\Projects\\\\WasteDetector\\\\WasteDetector_ESP32\\\\.pio\\\\build\\\\esp32dev\\\\idedata.json\" | ConvertFrom-Json; $json.includes.build | Select-Object -First 10)",
+      "Read(//c/Users/NVVuong/.platformio/packages/framework-arduinoespressif32/**)",
+      "PowerShell($p = Get-Content \"C:\\\\Users\\\\NVVuong\\\\.platformio\\\\packages\\\\framework-arduinoespressif32\\\\package.json\" | ConvertFrom-Json; \"$\\($p.name\\) @ $\\($p.version\\)\")",
+      "Read(//c/Users/NVVuong/.platformio/platforms/espressif32/**)",
+      "Read(//c/Users/NVVuong/.platformio/platforms/**)",
+      "Read(//c/Users/NVVuong/.platformio/**)",
+      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\.platformio\" | Select-Object Name, LastWriteTime)"
     ],
     "additionalDirectories": [
       "d:\\Projects\\WasteDetector\\Raspberry PI"
