@@ -259,8 +259,8 @@ python3 main_controller.py
 ## Vấn đề đã biết / TODO
 
 ### Chưa implement
-- `task_realtime.cpp` — chưa có code
-- `task_comms.cpp` — chưa có code
+- `task_realtime.cpp` — đã có code(có thể chưa đúng)
+- `task_comms.cpp` — đã có code(có thể chưa đúng)
 - `pi_camera_classifier.py` — chưa có code phân loại AI
 - `pi_classifier_fusion.py` — chưa có code tổng hợp
 
