@@ -22,9 +22,8 @@ from pi_config import (
     KNOCK_COUNT, MIN_CONFIDENCE, POST_CLASSIFY_DISPLAY_S,
     WASTE_NAMES, WASTE_NONE,
 )
-from pi_communication import ESP32Controller
-from pi_audio_classifier import AudioClassifier
-from pi_camera_detector import ObjectDetector
+from pi_communication import ESP32Comm
+from pi_audio_classifier import ESP32AudioClassifier
 from pi_camera_classifier import CameraClassifier
 from pi_classifier_fusion import ClassifierFusion
 from pi_gui_display import WasteSorterGUI
@@ -39,9 +38,8 @@ class WasteDetectorSystem:
         self._discharge_done_event = Event()
         self._object_event = Event()
 
-        self.esp32 = ESP32Controller(on_event=self._on_esp32_event)
-        self.audio = AudioClassifier()
-        self.camera_detector = ObjectDetector()
+        self.esp32 = ESP32Comm(on_event=self._on_esp32_event)
+        self.audio = ESP32AudioClassifier()
         self.camera_classifier = CameraClassifier()
         self.fusion = ClassifierFusion()
         self.gui = WasteSorterGUI()

@@ -12,15 +12,6 @@ VAI TRÒ TRONG HỆ THỐNG
   gộp lại thành 1 audio_consensus.
 - Hoàn toàn không can thiệp cơ cấu — chỉ đọc tín hiệu, xử lý số.
 
-
-KÊNH VẬT LÝ (đã thay đổi so với phiên bản cũ — CẬP NHẬT THEO CLAUDE.md)
------------------------------------------------------------------------
-- Mic: **INMP441 qua I2S** (KHÔNG còn dùng MAX9814 + USB sound card).
-- Pin Pi 4: SCK=GPIO18, WS=GPIO19, SD=GPIO20, VDD=3.3V, GND chung.
-- Cần `dtparam=i2s=on` + overlay phù hợp trong /boot/config.txt.
-- Có thể cần wrapper sounddevice trỏ về device I2S thay vì USB.
-
-
 NGUYÊN LÝ PHÂN LOẠI
 -------------------
 Khi va đập, mỗi vật liệu cộng hưởng ở dải tần khác nhau và phân rã
@@ -43,22 +34,6 @@ Confidence = tỷ lệ năng lượng của dải thắng cuộc / tổng năng 
 
 PIPELINE XỬ LÝ TÍN HIỆU
 -----------------------
-1. **Thu âm**: sd.rec(window_samples, sample_rate, channels=1, dtype=float32).
-   - window_samples = int(AUDIO_SAMPLE_RATE * AUDIO_WINDOW_S).
-   - Block (sd.wait()) cho đến khi đủ mẫu.
-
-2. **Tiền xử lý**:
-   - DC offset removal: x -= mean(x).
-   - Normalize amplitude về [-1, 1] nếu cần (sd.rec đã trả float32 chuẩn).
-   - Kiểm tra im lặng: nếu max(|x|) < noise_threshold (≈0.01) → trả
-     (WASTE_NONE, 0.0) ngay, không phân tích tiếp.
-
-3. **Lọc nhiễu**: Butterworth bandpass bậc 4, 100–8000 Hz, dùng filtfilt
-   (zero-phase) để không méo pha.
-
-4. **FFT**: scipy.fft.fft, lấy nửa dương phổ (0 → Nyquist),
-   magnitude = 2/N * |yf|.
-
 5. **Trích đặc trưng**:
    - dominant_freq = freq tại argmax(magnitude).
    - energy_bands[type] = Σ magnitude[band]² trong từng dải đặc trưng.
@@ -83,47 +58,6 @@ GIAO DIỆN LỚP — yêu cầu (đã có và CẦN BỔ SUNG)
   - calibrate(waste_type, num_samples=10)
   - save_calibration() / load_calibration()
 
-CẦN BỔ SUNG cho tích hợp với main_controller:
-  - record_and_classify() -> (waste_type, confidence)
-      Tiện ích 1-call: gọi record_knock() rồi classify(), bỏ field
-      `analysis` đi → trả về đúng tuple 2 phần tử mà fusion cần.
-      Đây là method main_controller sẽ gọi trong vòng lặp KNOCK_COUNT.
-
-  - (tùy chọn) trigger_async(callback): bắn record_and_classify() trên
-      thread riêng và gọi callback(type, conf) khi xong. Hữu ích nếu
-      main_controller muốn KNOCK + thu âm OVERLAP để không cộng dồn
-      độ trễ.
-
-
-VẤN ĐỀ TÍCH HỢP CẦN SỬA (QUAN TRỌNG — không sửa = sai ngăn rác!)
----------------------------------------------------------------
-File hiện đang định nghĩa LẠI hằng số WASTE_* trong class với MÃ KHÁC
-pi_config:
-
-       Định nghĩa trong class (SAI):     pi_config.py (ĐÚNG):
-       WASTE_METAL   = 0x01              WASTE_PLASTIC = 1
-       WASTE_GLASS   = 0x02              WASTE_GLASS   = 2
-       WASTE_PLASTIC = 0x03              WASTE_PAPER   = 3
-       WASTE_PAPER   = 0x04              WASTE_METAL   = 4
-
-→ Nếu classifier trả 1 thì main_controller gửi ROTATE target=1 = ngăn
-  NHỰA, nhưng audio classifier đang dùng 1 với ý nghĩa KIM LOẠI.
-  Kết quả: rác kim loại bị xoay sang ngăn nhựa.
-
-SỬA: xóa block 6 dòng định nghĩa WASTE_* trong class, import từ pi_config
-trước class:
-       from pi_config import (WASTE_NONE, WASTE_PLASTIC, WASTE_GLASS,
-                              WASTE_PAPER, WASTE_METAL, WASTE_NAMES,
-                              AUDIO_SAMPLE_RATE, AUDIO_WINDOW_S,
-                              AUDIO_DEVICE_ID)
-Và:
-  - self.sample_rate = AUDIO_SAMPLE_RATE
-  - self.record_duration = AUDIO_WINDOW_S   (đang là 0.5, pi_config là 0.3)
-  - Key của self.freq_ranges dùng WASTE_PLASTIC/WASTE_GLASS/... từ
-    pi_config (giá trị int sẽ tự khớp).
-  - Mọi `self.WASTE_*` trong code → đổi sang module-level `WASTE_*`.
-
-
 YÊU CẦU KỸ THUẬT / RÀNG BUỘC
 -----------------------------
 - record_knock() là BLOCKING (sd.wait) → main_controller phải gọi từ
@@ -136,11 +70,14 @@ YÊU CẦU KỸ THUẬT / RÀNG BUỘC
 - Khi calibration file tồn tại, freq_ranges nên cập nhật từ file
   (đã có logic load_calibration) — nhưng phải đảm bảo key dùng cùng
   mã WASTE_* sau khi sửa.
-- INMP441 trả tín hiệu I2S 24-bit signed; pyaudio/sounddevice qua
-  ALSA tự chuyển sang float32 — không cần xử lý raw bit.
-- noise_threshold (=0.01) cần re-calibrate cho INMP441 — gain khác
-  MAX9814. Khuyến nghị: chạy đo nhiễu nền 5s ở môi trường thực và
-  set threshold = 3 × RMS nhiễu nền.
+- M-306 là USB audio class device chuẩn; sounddevice/pyaudio đọc qua
+  ALSA và trả thẳng float32 — không cần xử lý raw bit như mic I2S.
+- noise_threshold (=0.01) cần re-calibrate cho M-306 — độ nhạy/gain
+  khác thiết bị cũ (INMP441/MAX9814). Khuyến nghị: chạy đo nhiễu nền
+  5s ở môi trường thực và set threshold = 3 × RMS nhiễu nền.
+- Nếu Pi có nhiều USB audio device (vd thêm loa USB), cần chọn đúng
+  index bằng tên thiết bị (`sounddevice.query_devices()`) thay vì
+  hardcode index — index có thể đổi giữa các lần cắm lại.
 
 
 KỊCH BẢN LỖI CẦN XỬ LÝ
@@ -161,18 +98,104 @@ TEST ĐỘC LẬP
 - (Đề xuất thêm) Mode 3: đo noise floor 5s, in RMS và đề xuất
   noise_threshold mới.
 
-
-LIÊN KẾT
---------
-- Hằng số dùng chung: [[pi_config]] (WASTE_*, AUDIO_*).
-- Output đi tiếp vào: [[pi_classifier_fusion]].
-- Trigger từ event: [[pi_communication]] forward KNOCK_DONE →
-  [[main_controller]] gọi record_and_classify().
-
-
-THƯ VIỆN
---------
-  pip install numpy scipy sounddevice
-  (matplotlib KHÔNG cần cho production — chỉ dùng nếu vẽ phổ debug)
 """
 
+import enum
+
+import sounddevice as sd
+import numpy as np
+import scipy.signal as signal
+import scipy.fft as fft
+
+import logging
+
+from pi_config import (
+    WASTE_NONE,
+    WASTE_PLASTIC,
+    WASTE_GLASS,
+    WASTE_PAPER,
+    WASTE_METAL,
+    WASTE_NAMES,
+    AUDIO_WINDOW_S,
+    AUDIO_DEVICE_ID,  
+    AUDIO_SAMPLE_RATE,
+    AUDIO_CHANNELS,
+    AUDIO_FILTER_LOW,
+    AUDIO_FILTER_HIGH
+)
+
+AUDIO_OK = "OK"
+AUDIO_SILENT = "SILENT"
+AUDIO_CLIPPED = "CLIPPED"
+
+log = logging.getLogger(__name__)
+
+class ESP32AudioClassifier:
+
+    def __init__(self, device_id = AUDIO_DEVICE_ID):
+        self.device_id = device_id
+        self.sample_rate = AUDIO_SAMPLE_RATE
+        self.record_duration = AUDIO_WINDOW_S  
+        self.channels = AUDIO_CHANNELS
+        self.filter_low = AUDIO_FILTER_LOW
+        self.filter_high = AUDIO_FILTER_HIGH
+
+        self.freq_ranges = {
+            WASTE_METAL: (2000, 6000),
+            WASTE_GLASS: (1500, 4000),
+            WASTE_PLASTIC: (500, 2000),
+            WASTE_PAPER: (100, 800),
+        }
+
+        self.noise_min_threshold = 0.01  
+        self.noise_max_threshold = 0.99
+        
+    def list_devices(self):
+        devices = sd.query_devices()
+        for i, dev in enumerate(devices):
+            print(f"{i}: {dev['name']} (input: {dev['max_input_channels']}, output: {dev['max_output_channels']})")
+
+    def record_knock(self):
+        window_samples = int(self.sample_rate * self.record_duration)
+        try:
+            audio_data = sd.rec(
+                window_samples, samplerate=self.sample_rate, channels=self.channels, dtype='float32', device=self.device_id
+                )
+            sd.wait()  
+            return audio_data.flatten()
+        except sd.PortAudioError as e:
+            log.error(f"Error recording audio: {e}")
+            return np.array([])
+
+    def remove_dc_offset(self, audio_data):
+        return audio_data - np.mean(audio_data)
+
+    def check_audio_confidence(self, audio_data):
+        if np.max(np.abs(audio_data)) > self.noise_max_threshold:
+            log.warning("Audio clipping detected! Confidence may be reduced.")
+            return AUDIO_CLIPPED
+        elif np.max(np.abs(audio_data)) < self.noise_min_threshold:
+            log.info("Audio below noise threshold. Likely no valid knock detected.")
+            return AUDIO_SILENT
+        else:
+            log.info("Audio signal is within acceptable range.")
+            return AUDIO_OK
+
+    def filter_audio(self, audio_data):
+        sos = signal.butter(
+            4, [self.filter_low, self.filter_high], btype='bandpass', output='sos', fs = self.sample_rate
+            )
+        try:
+            filtered_audio = signal.sosfiltfilt(sos, audio_data)
+            return filtered_audio
+        except ValueError as e:
+            log.error(f"Error filtering audio: {e}. Bypassing filter.")
+            return audio_data
+
+    def analyze_fft(self, audio_data):
+        
+        
+            
+    
+
+    

@@ -42,9 +42,11 @@ CAMERA_ID = 0   # 0 = mặc định (USB webcam hoặc Pi Camera qua libcamera)
 # ============================================================
 # Audio
 # ============================================================
-AUDIO_DEVICE_ID   = None   # None = mặc định (INMP441 qua USB sound card)
+AUDIO_DEVICE_ID   = None   # None = mặc định (mic M-306 qua USB, xem `arecord -l` nếu cần chỉ định index)
 AUDIO_SAMPLE_RATE = 44100
 AUDIO_CHANNELS    = 1
+AUDIO_FILTER_LOW = 100
+AUDIO_FILTER_HIGH = 8000
 
 # ============================================================
 # GUI
