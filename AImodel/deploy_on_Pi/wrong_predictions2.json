@@ -1,0 +1,476 @@
+{
+  "summary": {
+    "total_tested": 1022,
+    "correct_predictions": 994,
+    "wrong_predictions_count": 28,
+    "accuracy_percentage": 97.26,
+    "elapsed_time_seconds": 31.11,
+    "common_misclassifications": {
+      "METAL -> GLASS": 4,
+      "GLASS -> METAL": 3,
+      "GLASS -> PET": 3,
+      "HDPE -> METAL": 3,
+      "PET -> GLASS": 3,
+      "CARTON -> HDPE": 2,
+      "GLASS -> HDPE": 2,
+      "CARTON -> PET": 1,
+      "CARTON -> METAL": 1,
+      "GLASS -> CARTON": 1,
+      "HDPE -> CARTON": 1,
+      "HDPE -> GLASS": 1,
+      "METAL -> HDPE": 1,
+      "METAL -> PET": 1,
+      "PET -> METAL": 1
+    }
+  },
+  "wrong_cases": [
+    {
+      "filename": "0_carton_test_138.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/CARTON/0_carton_test_138.jpg",
+      "ground_truth": "CARTON",
+      "predicted_label": "PET",
+      "predicted_confidence": 0.5329,
+      "true_label_probability": 0.4238,
+      "confidence_gap": 0.1091,
+      "all_class_probabilities": {
+        "CARTON": 0.4238,
+        "GLASS": 0.0264,
+        "HDPE": 0.0011,
+        "METAL": 0.0158,
+        "PET": 0.5329
+      }
+    },
+    {
+      "filename": "0_carton_test_40.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/CARTON/0_carton_test_40.jpg",
+      "ground_truth": "CARTON",
+      "predicted_label": "HDPE",
+      "predicted_confidence": 0.8747,
+      "true_label_probability": 0.1247,
+      "confidence_gap": 0.75,
+      "all_class_probabilities": {
+        "CARTON": 0.1247,
+        "GLASS": 0.0004,
+        "HDPE": 0.8747,
+        "METAL": 0.0002,
+        "PET": 0.0
+      }
+    },
+    {
+      "filename": "0_carton_test_61.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/CARTON/0_carton_test_61.jpg",
+      "ground_truth": "CARTON",
+      "predicted_label": "HDPE",
+      "predicted_confidence": 0.767,
+      "true_label_probability": 0.2329,
+      "confidence_gap": 0.5341,
+      "all_class_probabilities": {
+        "CARTON": 0.2329,
+        "GLASS": 0.0,
+        "HDPE": 0.767,
+        "METAL": 0.0,
+        "PET": 0.0001
+      }
+    },
+    {
+      "filename": "0_carton_test_94.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/CARTON/0_carton_test_94.jpg",
+      "ground_truth": "CARTON",
+      "predicted_label": "METAL",
+      "predicted_confidence": 0.9533,
+      "true_label_probability": 0.0006,
+      "confidence_gap": 0.9527,
+      "all_class_probabilities": {
+        "CARTON": 0.0006,
+        "GLASS": 0.0,
+        "HDPE": 0.0461,
+        "METAL": 0.9533,
+        "PET": 0.0001
+      }
+    },
+    {
+      "filename": "0_glass_test_117.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/GLASS/0_glass_test_117.jpg",
+      "ground_truth": "GLASS",
+      "predicted_label": "HDPE",
+      "predicted_confidence": 0.9995,
+      "true_label_probability": 0.0005,
+      "confidence_gap": 0.9991,
+      "all_class_probabilities": {
+        "CARTON": 0.0,
+        "GLASS": 0.0005,
+        "HDPE": 0.9995,
+        "METAL": 0.0,
+        "PET": 0.0
+      }
+    },
+    {
+      "filename": "0_glass_test_123.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/GLASS/0_glass_test_123.jpg",
+      "ground_truth": "GLASS",
+      "predicted_label": "CARTON",
+      "predicted_confidence": 0.4062,
+      "true_label_probability": 0.2874,
+      "confidence_gap": 0.1189,
+      "all_class_probabilities": {
+        "CARTON": 0.4062,
+        "GLASS": 0.2874,
+        "HDPE": 0.1658,
+        "METAL": 0.1252,
+        "PET": 0.0154
+      }
+    },
+    {
+      "filename": "0_glass_test_138.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/GLASS/0_glass_test_138.jpg",
+      "ground_truth": "GLASS",
+      "predicted_label": "METAL",
+      "predicted_confidence": 0.557,
+      "true_label_probability": 0.4029,
+      "confidence_gap": 0.1541,
+      "all_class_probabilities": {
+        "CARTON": 0.0398,
+        "GLASS": 0.4029,
+        "HDPE": 0.0,
+        "METAL": 0.557,
+        "PET": 0.0002
+      }
+    },
+    {
+      "filename": "0_glass_test_141.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/GLASS/0_glass_test_141.jpg",
+      "ground_truth": "GLASS",
+      "predicted_label": "PET",
+      "predicted_confidence": 0.5828,
+      "true_label_probability": 0.417,
+      "confidence_gap": 0.1659,
+      "all_class_probabilities": {
+        "CARTON": 0.0,
+        "GLASS": 0.417,
+        "HDPE": 0.0002,
+        "METAL": 0.0,
+        "PET": 0.5828
+      }
+    },
+    {
+      "filename": "0_glass_test_148.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/GLASS/0_glass_test_148.jpg",
+      "ground_truth": "GLASS",
+      "predicted_label": "PET",
+      "predicted_confidence": 0.5489,
+      "true_label_probability": 0.4501,
+      "confidence_gap": 0.0988,
+      "all_class_probabilities": {
+        "CARTON": 0.0,
+        "GLASS": 0.4501,
+        "HDPE": 0.001,
+        "METAL": 0.0,
+        "PET": 0.5489
+      }
+    },
+    {
+      "filename": "0_glass_test_178.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/GLASS/0_glass_test_178.jpg",
+      "ground_truth": "GLASS",
+      "predicted_label": "PET",
+      "predicted_confidence": 0.4893,
+      "true_label_probability": 0.0449,
+      "confidence_gap": 0.4444,
+      "all_class_probabilities": {
+        "CARTON": 0.0001,
+        "GLASS": 0.0449,
+        "HDPE": 0.0003,
+        "METAL": 0.4655,
+        "PET": 0.4893
+      }
+    },
+    {
+      "filename": "0_glass_test_24.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/GLASS/0_glass_test_24.jpg",
+      "ground_truth": "GLASS",
+      "predicted_label": "METAL",
+      "predicted_confidence": 0.975,
+      "true_label_probability": 0.0015,
+      "confidence_gap": 0.9735,
+      "all_class_probabilities": {
+        "CARTON": 0.0001,
+        "GLASS": 0.0015,
+        "HDPE": 0.0,
+        "METAL": 0.975,
+        "PET": 0.0234
+      }
+    },
+    {
+      "filename": "0_glass_test_92.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/GLASS/0_glass_test_92.jpg",
+      "ground_truth": "GLASS",
+      "predicted_label": "HDPE",
+      "predicted_confidence": 0.5261,
+      "true_label_probability": 0.1237,
+      "confidence_gap": 0.4024,
+      "all_class_probabilities": {
+        "CARTON": 0.0001,
+        "GLASS": 0.1237,
+        "HDPE": 0.5261,
+        "METAL": 0.0009,
+        "PET": 0.3492
+      }
+    },
+    {
+      "filename": "0_glass_test_97.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/GLASS/0_glass_test_97.jpg",
+      "ground_truth": "GLASS",
+      "predicted_label": "METAL",
+      "predicted_confidence": 0.9213,
+      "true_label_probability": 0.0184,
+      "confidence_gap": 0.9029,
+      "all_class_probabilities": {
+        "CARTON": 0.0,
+        "GLASS": 0.0184,
+        "HDPE": 0.0,
+        "METAL": 0.9213,
+        "PET": 0.0603
+      }
+    },
+    {
+      "filename": "0_hdpe_test_116.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/HDPE/0_hdpe_test_116.jpg",
+      "ground_truth": "HDPE",
+      "predicted_label": "CARTON",
+      "predicted_confidence": 0.639,
+      "true_label_probability": 0.0416,
+      "confidence_gap": 0.5974,
+      "all_class_probabilities": {
+        "CARTON": 0.639,
+        "GLASS": 0.0,
+        "HDPE": 0.0416,
+        "METAL": 0.3148,
+        "PET": 0.0046
+      }
+    },
+    {
+      "filename": "0_hdpe_test_118.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/HDPE/0_hdpe_test_118.jpg",
+      "ground_truth": "HDPE",
+      "predicted_label": "METAL",
+      "predicted_confidence": 0.9709,
+      "true_label_probability": 0.0032,
+      "confidence_gap": 0.9676,
+      "all_class_probabilities": {
+        "CARTON": 0.0,
+        "GLASS": 0.0074,
+        "HDPE": 0.0032,
+        "METAL": 0.9709,
+        "PET": 0.0185
+      }
+    },
+    {
+      "filename": "0_hdpe_test_124.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/HDPE/0_hdpe_test_124.jpg",
+      "ground_truth": "HDPE",
+      "predicted_label": "METAL",
+      "predicted_confidence": 0.7397,
+      "true_label_probability": 0.2601,
+      "confidence_gap": 0.4796,
+      "all_class_probabilities": {
+        "CARTON": 0.0,
+        "GLASS": 0.0002,
+        "HDPE": 0.2601,
+        "METAL": 0.7397,
+        "PET": 0.0
+      }
+    },
+    {
+      "filename": "0_hdpe_test_140.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/HDPE/0_hdpe_test_140.jpg",
+      "ground_truth": "HDPE",
+      "predicted_label": "METAL",
+      "predicted_confidence": 0.9942,
+      "true_label_probability": 0.0006,
+      "confidence_gap": 0.9936,
+      "all_class_probabilities": {
+        "CARTON": 0.0007,
+        "GLASS": 0.0045,
+        "HDPE": 0.0006,
+        "METAL": 0.9942,
+        "PET": 0.0
+      }
+    },
+    {
+      "filename": "0_hdpe_test_48.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/HDPE/0_hdpe_test_48.jpg",
+      "ground_truth": "HDPE",
+      "predicted_label": "GLASS",
+      "predicted_confidence": 0.9825,
+      "true_label_probability": 0.0175,
+      "confidence_gap": 0.965,
+      "all_class_probabilities": {
+        "CARTON": 0.0,
+        "GLASS": 0.9825,
+        "HDPE": 0.0175,
+        "METAL": 0.0,
+        "PET": 0.0
+      }
+    },
+    {
+      "filename": "0_metal_test_109.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/METAL/0_metal_test_109.jpg",
+      "ground_truth": "METAL",
+      "predicted_label": "GLASS",
+      "predicted_confidence": 0.9996,
+      "true_label_probability": 0.0003,
+      "confidence_gap": 0.9992,
+      "all_class_probabilities": {
+        "CARTON": 0.0,
+        "GLASS": 0.9996,
+        "HDPE": 0.0,
+        "METAL": 0.0003,
+        "PET": 0.0001
+      }
+    },
+    {
+      "filename": "0_metal_test_141.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/METAL/0_metal_test_141.jpg",
+      "ground_truth": "METAL",
+      "predicted_label": "HDPE",
+      "predicted_confidence": 1.0,
+      "true_label_probability": 0.0,
+      "confidence_gap": 1.0,
+      "all_class_probabilities": {
+        "CARTON": 0.0,
+        "GLASS": 0.0,
+        "HDPE": 1.0,
+        "METAL": 0.0,
+        "PET": 0.0
+      }
+    },
+    {
+      "filename": "0_metal_test_145.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/METAL/0_metal_test_145.jpg",
+      "ground_truth": "METAL",
+      "predicted_label": "GLASS",
+      "predicted_confidence": 0.9999,
+      "true_label_probability": 0.0,
+      "confidence_gap": 0.9999,
+      "all_class_probabilities": {
+        "CARTON": 0.0,
+        "GLASS": 0.9999,
+        "HDPE": 0.0,
+        "METAL": 0.0,
+        "PET": 0.0001
+      }
+    },
+    {
+      "filename": "0_metal_test_48.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/METAL/0_metal_test_48.jpg",
+      "ground_truth": "METAL",
+      "predicted_label": "GLASS",
+      "predicted_confidence": 0.6247,
+      "true_label_probability": 0.3314,
+      "confidence_gap": 0.2934,
+      "all_class_probabilities": {
+        "CARTON": 0.0,
+        "GLASS": 0.6247,
+        "HDPE": 0.0176,
+        "METAL": 0.3314,
+        "PET": 0.0263
+      }
+    },
+    {
+      "filename": "0_metal_test_57.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/METAL/0_metal_test_57.jpg",
+      "ground_truth": "METAL",
+      "predicted_label": "GLASS",
+      "predicted_confidence": 0.6639,
+      "true_label_probability": 0.336,
+      "confidence_gap": 0.3279,
+      "all_class_probabilities": {
+        "CARTON": 0.0,
+        "GLASS": 0.6639,
+        "HDPE": 0.0,
+        "METAL": 0.336,
+        "PET": 0.0001
+      }
+    },
+    {
+      "filename": "0_metal_test_82.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/METAL/0_metal_test_82.jpg",
+      "ground_truth": "METAL",
+      "predicted_label": "PET",
+      "predicted_confidence": 0.621,
+      "true_label_probability": 0.379,
+      "confidence_gap": 0.2419,
+      "all_class_probabilities": {
+        "CARTON": 0.0,
+        "GLASS": 0.0,
+        "HDPE": 0.0,
+        "METAL": 0.379,
+        "PET": 0.621
+      }
+    },
+    {
+      "filename": "0_pet_test_129.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/PET/0_pet_test_129.jpg",
+      "ground_truth": "PET",
+      "predicted_label": "METAL",
+      "predicted_confidence": 0.9403,
+      "true_label_probability": 0.0595,
+      "confidence_gap": 0.8808,
+      "all_class_probabilities": {
+        "CARTON": 0.0,
+        "GLASS": 0.0001,
+        "HDPE": 0.0,
+        "METAL": 0.9403,
+        "PET": 0.0595
+      }
+    },
+    {
+      "filename": "0_pet_test_170.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/PET/0_pet_test_170.jpg",
+      "ground_truth": "PET",
+      "predicted_label": "GLASS",
+      "predicted_confidence": 0.5233,
+      "true_label_probability": 0.4765,
+      "confidence_gap": 0.0468,
+      "all_class_probabilities": {
+        "CARTON": 0.0,
+        "GLASS": 0.5233,
+        "HDPE": 0.0002,
+        "METAL": 0.0,
+        "PET": 0.4765
+      }
+    },
+    {
+      "filename": "0_pet_test_175.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/PET/0_pet_test_175.jpg",
+      "ground_truth": "PET",
+      "predicted_label": "GLASS",
+      "predicted_confidence": 0.7136,
+      "true_label_probability": 0.2804,
+      "confidence_gap": 0.4332,
+      "all_class_probabilities": {
+        "CARTON": 0.0,
+        "GLASS": 0.7136,
+        "HDPE": 0.0059,
+        "METAL": 0.0,
+        "PET": 0.2804
+      }
+    },
+    {
+      "filename": "0_pet_test_207.jpg",
+      "filepath": "/home/watse-classify/testYOLOv26/testData/PET/0_pet_test_207.jpg",
+      "ground_truth": "PET",
+      "predicted_label": "GLASS",
+      "predicted_confidence": 0.9987,
+      "true_label_probability": 0.0013,
+      "confidence_gap": 0.9974,
+      "all_class_probabilities": {
+        "CARTON": 0.0,
+        "GLASS": 0.9987,
+        "HDPE": 0.0,
+        "METAL": 0.0,
+        "PET": 0.0013
+      }
+    }
+  ]
+}
