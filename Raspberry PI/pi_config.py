@@ -5,7 +5,7 @@ pi_config.py — Hằng số và cấu hình toàn hệ thống Raspberry Pi
 # ============================================================
 # Serial UART → ESP32
 # ============================================================
-ESP32_PORT     = '/dev/ttyS0'   # GPIO 14/15 (UART0) — enable_uart=1 in /boot/config.txt
+ESP32_PORT     = '/dev/serial0' # Symlink chuẩn trỏ đến UART phần cứng (PL011 hoặc miniUART)
 ESP32_BAUDRATE = 115200
 ESP32_TIMEOUT  = 5.0            # giây chờ response mặc định
 
