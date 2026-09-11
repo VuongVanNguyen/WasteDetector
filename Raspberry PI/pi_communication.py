@@ -337,20 +337,37 @@ class ESP32Comm:
                 raw = self._ser.readline()
                 if not raw:
                     continue  # readline timeout — quay lại kiểm tra _running
-                line = raw.decode('utf-8', errors='replace').strip()
+                # Làm sạch byte null và khoảng trắng ẩn
+                line = raw.decode('utf-8', errors='replace').replace('\x00', '').strip()
                 if not line:
                     continue
-                event = json.loads(line)
-                name = event.get("event")
-                if name == "ALIVE":
-                    self._alive_event.set()
-                if self.on_event:
-                    try:
-                        self.on_event(event)
-                    except Exception as e:
-                        log.error("[ESP32] on_event raised: %s", e)
-            except json.JSONDecodeError:
-                log.debug("[ESP32] Dòng không phải JSON, bỏ qua: %r", line)
+
+                event = None
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    # Bẫy dự phòng 1: Trích xuất đoạn JSON {...} nếu bị dính log debug
+                    import re
+                    match = re.search(r'\{.*?\}', line)
+                    if match:
+                        try:
+                            event = json.loads(match.group(0))
+                        except json.JSONDecodeError:
+                            pass
+
+                    # Bẫy dự phòng 2: Kiểm tra trực tiếp chuỗi ALIVE phòng trường hợp JSON bị lệch
+                    if "ALIVE" in line.upper():
+                        self._alive_event.set()
+
+                if event and isinstance(event, dict):
+                    name = event.get("event")
+                    if name == "ALIVE":
+                        self._alive_event.set()
+                    if self.on_event:
+                        try:
+                            self.on_event(event)
+                        except Exception as e:
+                            log.error("[ESP32] on_event raised: %s", e)
             except serial.SerialException as e:
                 log.error("[ESP32] Lỗi serial trong reader: %s", e)
                 break  # main_controller phát hiện qua reconnect_needed
