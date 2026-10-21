@@ -41,7 +41,8 @@
 //     trông y hệt nhau. NVS nhớ "lần cuối ống đứng ở đâu / đang đi từ đâu tới
 //     đâu" để phân xử:
 //       - Dò mặc định theo CW. Ngoại lệ: NVS nói ống ở phía Kim loại (bị ngắt
-//         khi đang đi TỚI Kim loại, hoặc lần cuối đứng ở Kim loại) → dò CCW.
+//         khi đang đi TỚI hoặc đang đi TỪ Kim loại, hoặc lần cuối đứng ở Kim
+//         loại) → dò CCW.
 //       - Dò CW mà gặp Nhựa trước tiên = ống đi ra từ vùng cấm. Chỉ chấp nhận
 //         khi NVS nói ống đang ở phía Nhựa. Tương tự dò CCW gặp Kim loại.
 //       - Boot thấy ngay Nhựa trong khi NVS nói phía Kim loại (hoặc ngược lại)
@@ -192,18 +193,25 @@ static void nvMarkStopped(int idx) {
 }
 
 // Phía của ống theo gợi ý NVS: +1 = phía Kim loại, −1 = phía Nhựa, 0 = không rõ.
+// Đang chạy lệnh thì xét CẢ hai đầu lệnh: vừa rời Kim loại về HOME mà mất điện,
+// ống có thể vẫn còn lố qua tấm phản quang Kim loại (+185°).
 static int hintSide() {
-    int ref = nv.moving ? nv.toIdx : nv.lastIdx;
-    if (ref == IDX_METAL)   return +1;
-    if (ref == IDX_PLASTIC) return -1;
-    return 0;
+    if (!nv.moving) {
+        if (nv.lastIdx == IDX_METAL)   return +1;
+        if (nv.lastIdx == IDX_PLASTIC) return -1;
+        return 0;
+    }
+    const bool m = nv.fromIdx == IDX_METAL   || nv.toIdx == IDX_METAL;
+    const bool p = nv.fromIdx == IDX_PLASTIC || nv.toIdx == IDX_PLASTIC;
+    if (m && p) return 0;   // Kim loại ↔ Nhựa (chỉ có ở hiệu chuẩn): ống có thể ở bất cứ đâu trên cung
+    return m ? +1 : p ? -1 : 0;
 }
 
 // Chiều dò khi không cảm biến nào bị che. Xem mục (5).
-// Mặc định CW. Chỉ đổi sang CCW khi ống được biết là ở phía Kim loại (đang đi
-// tới Kim loại thì bị ngắt, hoặc lần cuối đứng ở Kim loại): lố qua Kim loại là
-// đã vào vùng cấm, dò CW tiếp sẽ ra Nhựa ở +270°. Mọi trường hợp khác — kể cả
-// bị ngắt giữa lúc VỀ HOME — CW đều an toàn và gặp IR gần nhất.
+// Mặc định CW. Chỉ đổi sang CCW khi lệnh gần nhất dính tới Kim loại (đang đi
+// tới Kim loại, đang từ Kim loại về, hoặc lần cuối đứng ở Kim loại): lố qua
+// Kim loại là đã vào vùng cấm, dò CW tiếp sẽ ra Nhựa ở +270°. Mọi trường hợp
+// khác CW đều an toàn và gặp IR gần nhất.
 static int seekDir() {
     return hintSide() == +1 ? MOTOR_DIR_CCW : MOTOR_DIR_CW;
 }
@@ -226,6 +234,7 @@ static bool curEstimated = false;     // vị trí do canh giờ, không do cả
 static bool        faultLatched = false;
 static const char* faultWhy     = NULL;
 static int         consecFail   = 0;
+static char        faultBuf[96];          // lý do FAULT nạp lại từ NVS lúc boot
 
 bool        motionFaulted()           { return faultLatched; }
 const char* motionFaultReason()       { return faultLatched ? faultWhy : NULL; }
@@ -355,6 +364,10 @@ static void latchFault(const char* why) {
     Serial.printf("[CANH BAO NANG] %s — KHONG khoa (MOTION_FAULT_LATCH=0). Kiem tra day cap!\n", why);
     return;
 #endif
+    // Lưu chốt qua mất điện: reset nguồn KHÔNG được là lối gỡ FAULT, vì một IR
+    // không cho biết độ xoắn (xem mục (5)). Key riêng, không đụng NvState.
+    // Motor vừa phanh xong ở trên nên ghi flash lúc này là an toàn.
+    if (!faultLatched && nvOk) prefs.putString("fault", why);
     faultLatched = true;
     faultWhy     = why;
     Serial.println("");
@@ -365,6 +378,7 @@ static void latchFault(const char* why) {
     Serial.println("#   2. Jog ('[' / ']') hoac quay TAY ong ve ngan Thuy tinh,");
     Serial.println("#      day phai THANG hoan toan khi ong dung o do.");
     Serial.println("#   3. Bam 'f' de mo khoa (hoac reset nguon khi ong o Thuy tinh).");
+    Serial.println("#   Chot duoc luu NVS: reset nguon o ngan khac van KHOA.");
     Serial.println("############################################################");
 }
 
@@ -936,7 +950,23 @@ bool motionHomeOnBoot() {
         Serial.println("[BOOT] Da HUY tu ve HOME theo lenh dung khan.");
         return false;
     }
-    if (refuseIfFault()) return false;
+    if (faultLatched) {
+        // Chốt từ lần chạy trước. Chỉ gỡ khi ống ĐANG ĐỨNG trên Thủy tinh (người
+        // vận hành đã quay tay về đó, dây thẳng) — Thủy tinh là station duy nhất
+        // không mơ hồ về độ xoắn. IR Thủy tinh đã chết thì không tin được → 'f'.
+        Serial.printf("[BOOT] Lan truoc da KHOA (FAULT): %s\n", faultWhy);
+        if (irMask() != (1u << STATION_HOME_IDX)) {
+            motionPrintIrDump();
+            Serial.println("[BOOT] Ong KHONG dung tren Thuy tinh — giu KHOA, motor khong chay.");
+            Serial.println("       Quay tay ong ve Thuy tinh (day thang) roi reset, hoac jog + 'f'.");
+            return false;
+        }
+        Serial.println("[BOOT] Ong dang o Thuy tinh — coi nhu da thao xoan, MO KHOA.");
+        faultLatched = false;
+        faultWhy     = NULL;
+        consecFail   = 0;
+        if (nvOk) prefs.remove("fault");
+    }
     if (!locate(true)) {
         Serial.println("[BOOT] KHONG xac dinh duoc vi tri.");
         return false;
@@ -998,6 +1028,7 @@ bool motionClearFault() {
     faultLatched = false;
     faultWhy     = NULL;
     consecFail   = 0;
+    if (nvOk) prefs.remove("fault");
     curIdx       = IDX_NONE;
     nv.moving    = 0;
     nv.lastIdx   = nv.fromIdx = nv.toIdx = IDX_NONE;
@@ -1077,6 +1108,12 @@ void motionBegin() {
     faultLatched = false;
     faultWhy     = NULL;
     consecFail   = 0;
+    if (nvOk && prefs.isKey("fault")) {
+        prefs.getString("fault", faultBuf, sizeof faultBuf);
+        faultLatched = true;
+        faultWhy     = faultBuf[0] ? faultBuf : "(khong ro ly do)";
+        Serial.printf("[NVS] Chot FAULT tu lan chay truoc: %s\n", faultWhy);
+    }
     curIdx       = IDX_NONE;
     curEstimated = false;
 }

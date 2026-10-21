@@ -17,6 +17,8 @@ void motionBegin();
 // Bắt buộc về HOME khi khởi động. Gọi MỘT lần ngay sau motionBegin(), TRƯỚC
 // khi nhận lệnh. Chờ BOOT_HOME_GRACE_MS (có thể dừng khẩn trong lúc chờ), đọc
 // IR xác định vị trí — đứng lưng chừng thì dò — rồi quay về Thủy tinh.
+// FAULT được lưu NVS: còn chốt từ lần trước thì chỉ tự gỡ khi ống đang đứng
+// trên Thủy tinh, ngược lại trả về false và motor không chạy.
 bool motionHomeOnBoot();
 
 // Vị trí hiện tại: WASTE_PLASTIC..WASTE_METAL, hoặc WASTE_NONE (chưa biết).
