@@ -1,0 +1,28 @@
+description: Ultralytics YOLO26n-cls model trained on /home/mpec-lab/YOLO26/MPEC_dataset_ultra_bottle_classification-20260803T133316Z-1-001/MPEC_dataset_ultra_bottle_classification/
+author: Ultralytics
+date: '2026-09-05T16:26:11.784708+07:00'
+version: 8.4.115
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 1
+task: classify
+head: Classify
+batch: 1
+imgsz:
+- 224
+- 224
+names:
+  0: CARTON
+  1: GLASS
+  2: HDPE
+  3: METAL
+  4: PET
+args:
+  data: null
+  batch: 1
+  fraction: 1.0
+  quantize: null
+  dynamic: false
+  nms: false
+channels: 3
+end2end: false
