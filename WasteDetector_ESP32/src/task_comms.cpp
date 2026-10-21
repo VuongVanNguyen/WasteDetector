@@ -30,15 +30,24 @@ static void sendEventInt(const char* event, const char* key, int value) {
     UART_PI.print('\n');
 }
 
+static const char* errorCodeName(int param) {
+    switch (param) {
+        case 1:  return "INVALID_CMD";
+        case 2:  return "HOME_FAILED";
+        case 3:  return "MOTION_FAULT";   // engine da KHOA — xem tasks.h
+        default: return "MOTOR_TIMEOUT";
+    }
+}
+
 static void sendResponse(const Response_t& resp) {
     JsonDocument doc;
     doc["event"] = resp.event;
     if (strcmp(resp.event, "KNOCK_DONE") == 0)
         doc["seq"]      = resp.param;
-    else if (strcmp(resp.event, "ROTATE_DONE") == 0)
+    else if (strcmp(resp.event, "ROTATE_DONE") == 0 || strcmp(resp.event, "READY") == 0)
         doc["position"] = resp.param;
     else if (strcmp(resp.event, "ERROR") == 0)
-        doc["code"]     = (resp.param == 1) ? "INVALID_CMD" : "MOTOR_TIMEOUT";
+        doc["code"]     = errorCodeName(resp.param);
     serializeJson(doc, UART_PI);
     UART_PI.print('\n');
 }
@@ -46,21 +55,29 @@ static void sendResponse(const Response_t& resp) {
 void taskComms(void* pvParameters) {
     pinMode(PIN_ULTRASONIC_TRIG, OUTPUT);
     pinMode(PIN_ULTRASONIC_ECHO, INPUT);
-    pinMode(PIN_RELAY, OUTPUT);
-    digitalWrite(PIN_RELAY, LOW);   
 
     String inputBuffer;
     inputBuffer.reserve(128);
 
     bool objectPresent = false;
 
+    // BẢO VỆ: chỉ báo OBJECT_DETECTED khi ống ĐÃ đậu tại HOME và không có chu
+    // kỳ nào đang chạy. Core 1 bật cờ này bằng event READY (sau boot-home và
+    // sau mỗi lần xả). Thiếu cổng chặn này thì một vật rơi vào lúc ống còn đang
+    // quay sẽ khởi động chu kỳ thứ hai chồng lên chu kỳ đang dở — rác xuống sai
+    // ngăn, và lệnh ROTATE thứ hai vào hàng đợi lúc vị trí chưa chốt.
+    bool readyForObject = false;
+
     for (;;) {
         int dist     = measureDistanceCm();
         bool detected = (dist > 0 && dist < ULTRASONIC_DETECT_CM);
 
         if (detected && !objectPresent) {
-            sendEventInt("OBJECT_DETECTED", "distance", dist);
             objectPresent = true;
+            if (readyForObject) {
+                sendEventInt("OBJECT_DETECTED", "distance", dist);
+                readyForObject = false;     // khoá cho tới READY kế tiếp
+            }
         } else if (!detected && objectPresent) {
             objectPresent = false;
         }
@@ -98,12 +115,14 @@ void taskComms(void* pvParameters) {
                     msg.param = 0;
                     xQueueSend(commandQueue, &msg, pdMS_TO_TICKS(10));
 
-                } else if (strcmp(cmd, "LIGHT") == 0) {
-                    const char* state = doc["state"];
-                    if (state && strcmp(state, "ON") == 0)
-                        digitalWrite(PIN_RELAY, HIGH);
-                    else
-                        digitalWrite(PIN_RELAY, LOW);
+                } else if (strcmp(cmd, "HOME") == 0) {
+                    // Lối khôi phục cho Pi: ép ống về HOME (ngăn Thủy tinh) mà
+                    // không cần một chu kỳ đầy đủ. Dùng sau khi Pi huỷ chu kỳ
+                    // giữa chừng. KHÔNG gỡ được chốt FAULT — cái đó cần người.
+                    Command_t msg;
+                    strlcpy(msg.cmd, "HOME", sizeof(msg.cmd));
+                    msg.param = 0;
+                    xQueueSend(commandQueue, &msg, pdMS_TO_TICKS(10));
 
                 } else if (strcmp(cmd, "PING") == 0) {
                     sendEvent("ALIVE");
@@ -117,6 +136,10 @@ void taskComms(void* pvParameters) {
 
         Response_t resp;
         while (xQueueReceive(responseQueue, &resp, 0) == pdTRUE) {
+            // READY = ống đã đậu tại HOME → mở cổng nhận vật. ERROR không mở
+            // cổng: khi Core 1 báo lỗi (nhất là MOTION_FAULT) thì phải có người
+            // xử lý, không được tự nhận vật tiếp.
+            if (strcmp(resp.event, "READY") == 0) readyForObject = true;
             sendResponse(resp);
         }
 

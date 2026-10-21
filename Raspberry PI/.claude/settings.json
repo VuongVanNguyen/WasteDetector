@@ -1,7 +1,24 @@
 {
   "permissions": {
     "allow": [
-      "WebSearch"
+      "WebSearch",
+      "Bash(pio run *)",
+      "PowerShell($env:PATH += \";$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\"; pio --version 2>&1)",
+      "PowerShell($env:PATH += \";$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\"; cd D:\\\\Projects\\\\WasteDetector\\\\WasteDetector_ESP32; pio run -e test_motor_ir 2>&1 | Select-Object -Last 80)",
+      "PowerShell($p = \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\"; if \\(Test-Path $p\\) { Write-Output \"FOUND: $p\" } else { Get-Command pio, platformio -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source })",
+      "PowerShell(Set-Location \"d:\\\\Projects\\\\WasteDetector\\\\WasteDetector_ESP32\"; & \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\" run -e test_motor_ir 2>&1 | Select-Object -Last 30)",
+      "PowerShell(Set-Location \"d:\\\\Projects\\\\WasteDetector\\\\WasteDetector_ESP32\"; & \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\" run -e test_motor_ir 2>&1 | Select-Object -Last 25)",
+      "PowerShell(Set-Location \"d:\\\\Projects\\\\WasteDetector\\\\WasteDetector_ESP32\"; & \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\" run -e esp32dev -e test_full_cycle -e test_motor_simple 2>&1 | Select-Object -Last 40)",
+      "PowerShell(Set-Location \"d:\\\\Projects\\\\WasteDetector\\\\WasteDetector_ESP32\"; & \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\" run 2>&1 | Select-Object -Last 12)",
+      "PowerShell(Set-Location \"d:\\\\Projects\\\\WasteDetector\\\\WasteDetector_ESP32\"; & \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\" run -e esp32dev -e test_hcsr04 -e test_servo -e test_motor_ir -e test_full_cycle -e test_motor_simple 2>&1 | Select-Object -Last 12)",
+      "PowerShell(Set-Location \"d:\\\\Projects\\\\WasteDetector\\\\WasteDetector_ESP32\"; & \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\" run -e esp32dev -e test_motor_ir -e test_full_cycle -e test_motor_simple 2>&1 | Select-Object -Last 10)",
+      "Bash(grep -vE \"^\\\\S+: *//\")",
+      "PowerShell($p = \\(Get-Command pio -ErrorAction SilentlyContinue\\).Source; if \\(-not $p\\) { $p = \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\" }; if \\(Test-Path $p\\) { & $p run -e test_motor_ir | Select-Object -Last 15 } else { \"pio not found\" })",
+      "PowerShell(Get-Command pio -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source; Test-Path \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\"; Get-ChildItem \"$env:USERPROFILE\\\\.platformio\\\\packages\" -Name -ErrorAction SilentlyContinue | Select-String framework)",
+      "PowerShell(Get-Content \"$env:USERPROFILE\\\\.platformio\\\\packages\\\\framework-arduinoespressif32\\\\package.json\" | Select-String '\"version\"'; Select-String -Path \"$env:USERPROFILE\\\\.platformio\\\\packages\\\\framework-arduinoespressif32\\\\cores\\\\esp32\\\\esp32-hal-gpio.c\" -Pattern \"ARDUINO_ISR_FLAG|esp_intr_alloc|gpio_isr_register\" | Select-Object -First 5)",
+      "PowerShell(cd D:\\\\Projects\\\\WasteDetector\\\\WasteDetector_ESP32; & \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\" run -e test_motor_ir -e test_full_cycle -e esp32dev 2>&1 | Select-String -Pattern \"error|warning: |SUCCESS|FAILED|Environment\" | Select-Object -First 60)",
+      "PowerShell(& \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\" run -e test_motor_ir -e test_full_cycle -e esp32dev 2>&1 | Select-String -Pattern \"error|warning: |Environment|SUCCESS  |FAILED\" | Select-Object -First 40)",
+      "PowerShell(& \"$env:USERPROFILE\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\" run -e test_motor_ir -e test_full_cycle -e esp32dev 2>&1 | Select-String -Pattern \"error|warning: |Environment|SUCCESS  |FAILED\" | Select-Object -First 40; Select-String -Path src\\\\motion.cpp -Pattern \"static int seekDir\" -Context 0,2)"
     ]
   }
 }

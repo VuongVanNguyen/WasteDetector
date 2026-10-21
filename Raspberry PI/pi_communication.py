@@ -4,10 +4,10 @@ pi_communication.py — Giao tiếp UART JSON 2 chiều với ESP32
 
 VAI TRÒ TRONG HỆ THỐNG
 ----------------------
-- Là **cầu nối DUY NHẤT** giữa lớp Pi (bộ não — AI, fusion, GUI) và
+- Là **cầu nối DUY NHẤT** giữa lớp Pi (bộ não — AI, fusion) và
   lớp ESP32 (cơ cấu — motor, servo, sensor).
-- Mất file này = toàn hệ thống đứng: Pi không bật được đèn, không ra
-  lệnh gõ, không biết khi nào có vật rơi vào ống.
+- Mất file này = toàn hệ thống đứng: Pi không ra lệnh gõ / xoay / xả,
+  không biết khi nào có vật rơi vào ống.
 - Được khởi tạo 1 lần trong main_controller, dùng xuyên suốt vòng đời
   chương trình. KHÔNG tạo nhiều instance — serial port là tài nguyên
   độc quyền.
@@ -32,7 +32,6 @@ GIAO THỨC (đồng bộ với CLAUDE.md)
 
   Pi → ESP32 (cmd):
     {"cmd": "PING"}
-    {"cmd": "LIGHT", "state": "ON"|"OFF"}
     {"cmd": "KNOCK", "count": 3}
     {"cmd": "ROTATE", "target": 1..4}
     {"cmd": "DISCHARGE"}
@@ -48,7 +47,7 @@ GIAO THỨC (đồng bộ với CLAUDE.md)
 
 KIẾN TRÚC ĐA LUỒNG
 ------------------
-- Main thread: gọi các send_* khi cần ra lệnh (blocking ngắn — chỉ
+- Worker thread (main_controller): gọi các send_* khi cần ra lệnh (blocking ngắn — chỉ
   ghi vào serial).
 - Reader thread (daemon=True): vòng lặp đọc readline() blocking,
   parse JSON, gọi callback `on_event(dict)` — KHÔNG xử lý logic ở
@@ -96,9 +95,6 @@ send_rotate(waste_type: int):
 send_discharge():
   - _send({"cmd": "DISCHARGE"}).
 
-send_light(state: bool):
-  - _send({"cmd": "LIGHT", "state": "ON" if state else "OFF"}).
-
 _send(payload: dict):
   - Nếu self._ser is None hoặc không mở → log + return (no-op),
     KHÔNG raise — main_controller có thể đang chạy chế độ "no ESP32".
@@ -140,12 +136,11 @@ YÊU CẦU KỸ THUẬT / RÀNG BUỘC
 -----------------------------
 - Toàn bộ I/O serial phải TOLERANT — port có thể rớt bất kỳ lúc nào
   (rút USB, ESP32 reset, brown-out). Không bao giờ để exception trồi
-  lên main_controller gây crash GUI Tkinter.
+  lên main_controller giết worker thread.
 - Reader thread phải là **daemon** để không chặn process exit.
 - Reader callback `on_event` CHẠY TRÊN READER THREAD — main_controller
-  hiện chỉ set threading.Event trong handler → an toàn. Tuyệt đối
-  không gọi Tkinter widget trực tiếp trong on_event (Tk không
-  thread-safe) — nếu cần update GUI thì dùng .after(0, fn) hoặc queue.
+  hiện chỉ set threading.Event trong handler → an toàn. Không làm việc
+  blocking trong on_event — reader thread kẹt thì mất event kế tiếp.
 - Không retry tự động trên send — main_controller chịu trách nhiệm
   timeout (.wait(timeout=5/10/5)) và quyết định fallback. Triết lý:
   truyền thông "fire and forget" cho cmd, "event-driven" cho phản hồi.
@@ -174,8 +169,7 @@ KỊCH BẢN LỖI CẦN XỬ LÝ
 
 TEST ĐỘC LẬP (__main__ block — đề xuất thêm)
 --------------------------------------------
-- Kết nối, ping, gửi LIGHT ON / LIGHT OFF cách nhau 1s, in mọi event
-  nhận được. Mục đích: smoke test phần cứng UART trước khi chạy full
+- Kết nối, ping, in mọi event nhận được trong vài giây. Mục đích: smoke test phần cứng UART trước khi chạy full
   hệ thống.
 
 
@@ -308,10 +302,6 @@ class ESP32Comm:
         """Ra lệnh mở cửa đáy xả vật thể."""
         self._send({"cmd": "DISCHARGE"})
 
-    def send_light(self, state: bool):
-        """Bật (True) hoặc tắt (False) đèn chiếu sáng qua relay."""
-        self._send({"cmd": "LIGHT", "state": "ON" if state else "OFF"})
-
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -400,14 +390,6 @@ if __name__ == "__main__":
     if not comm.connect():
         print("Không kết nối được serial. Kiểm tra port và quyền.")
         raise SystemExit(1)
-
-    print("Gửi LIGHT ON …")
-    comm.send_light(True)
-    time.sleep(1.0)
-
-    print("Gửi LIGHT OFF …")
-    comm.send_light(False)
-    time.sleep(1.0)
 
     print("Lắng nghe event trong 5 giây …")
     time.sleep(5.0)

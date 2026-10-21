@@ -13,7 +13,7 @@ void setup() {
     responseQueue = xQueueCreate(RESPONSE_QUEUE_SIZE, sizeof(Response_t));
 
     // Core 1 — real-time mechanical control
-    xTaskCreatePinnedToCore(taskRealtime, "taskRealtime", 4096, NULL, 2, NULL, 1); //Real-time chạy ở đây
+    xTaskCreatePinnedToCore(taskRealtime, "taskRealtime", 8192, NULL, 2, NULL, 1); //Real-time chạy ở đây
 
     // Core 0 — communication & sensing
     xTaskCreatePinnedToCore(taskComms, "taskComms", 4096, NULL, 1, NULL, 0); //Comms chạy ở đây

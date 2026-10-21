@@ -1,13 +1,17 @@
+// ============================================================================
+// Core 1 (priority 2) — servo SG90/MG90S + motor GA25-370 + IR TCRT5000
+// ============================================================================
+// HOME = ngăn Thủy tinh. Sau khi xả, Core 1 TỰ đưa ống về HOME rồi đẩy event
+// READY — Pi không phải ra lệnh, nhưng KHÔNG được nhận vật mới trước READY.
+
 #include <Arduino.h>
 #include <ESP32Servo.h>
 #include "config.h"
+#include "motion.h"
 #include "tasks.h"
 
 static Servo servoKnock;
 static Servo servoDoor;
-static volatile bool irTriggered = false;
-static volatile int irPosition = WASTE_NONE; 
-static int currentPosition = WASTE_NONE;
 
 static inline void pushResponse(const char* event, int param) {
     Response_t resp = {};
@@ -32,13 +36,31 @@ static void doKnock(int count) {
 
         if (i < count) {
             TickType_t elapsed = xTaskGetTickCount() - t0;
-            if (elapsed < period) {
-                vTaskDelay(period - elapsed);
-            }
+            if (elapsed < period) vTaskDelay(period - elapsed);
         }
     }
 }
 
+// Closed-loop hoàn toàn: ISR phanh trên cạnh IR thật của đúng cảm biến đích.
+// Rác Thủy tinh là trường hợp hợp lệ mà ống KHÔNG quay — ngăn xả chính là HOME.
+static void doRotate(int target) {
+    if (target < WASTE_PLASTIC || target > WASTE_METAL) {
+        pushResponse("ERROR", 1);   // 1 = INVALID_CMD
+        return;
+    }
+    if (motionRotateTo(target)) pushResponse("ROTATE_DONE", motionPosition());
+    else if (motionFaulted())   pushResponse("ERROR", 3);   // 3 = MOTION_FAULT
+    else                        pushResponse("ERROR", 0);   // 0 = MOTOR_TIMEOUT
+}
+
+static void reportHome(bool ok) {
+    if (ok)                   pushResponse("READY", motionPosition());
+    else if (motionFaulted()) pushResponse("ERROR", 3);
+    else                      pushResponse("ERROR", 2);   // 2 = HOME_FAILED
+}
+
+// Xả rác rồi TỰ ĐƯA ỐNG VỀ HOME (Thủy tinh). Pi nhận DISCHARGE_DONE rồi đợi READY
+// trước khi cho phép vật mới rơi vào ống. Tách làm 2 event để Pi không phải chờ cả quãng quay chỉ để biết cửa đã đóng.
 static void doDischarge() {
     servoDoor.write(DOOR_OPEN_ANGLE);
     vTaskDelay(pdMS_TO_TICKS(DOOR_HOLD_MS));
@@ -47,76 +69,18 @@ static void doDischarge() {
     vTaskDelay(pdMS_TO_TICKS(DOOR_SETTLE_MS));
 
     pushResponse("DISCHARGE_DONE", 0);
+    reportHome(motionGoHome());
 }
 
-static void motorRotate(uint8_t speed) {
-    digitalWrite(PIN_MOTOR_IN1, HIGH);
-    digitalWrite(PIN_MOTOR_IN2, LOW);
-    ledcWrite(MOTOR_LEDC_CHANNEL, speed);
-} 
-
-static void motorStop() {
-    digitalWrite(PIN_MOTOR_IN1, HIGH);
-    digitalWrite(PIN_MOTOR_IN2, HIGH);
-    ledcWrite(MOTOR_LEDC_CHANNEL, 0);
-}
-
-void IRAM_ATTR irPLASTIC() { irTriggered = true; irPosition = WASTE_PLASTIC; }
-void IRAM_ATTR irGLASS()   { irTriggered = true; irPosition = WASTE_GLASS; }
-void IRAM_ATTR irPAPER()   { irTriggered = true; irPosition = WASTE_PAPER; }
-void IRAM_ATTR irMETAL()   { irTriggered = true; irPosition = WASTE_METAL; }
-
-static void doRotate(int target) {
-    if (target < WASTE_PLASTIC || target > WASTE_METAL) {
-        pushResponse("ERROR", 1);   // 1 = INVALID_CMD
-        return;
-    }
-    if (target == currentPosition) {
-        pushResponse("ROTATE_DONE", target);
-        return;
-    }
-
-    irTriggered = false;
-    irPosition = WASTE_NONE;
-    motorRotate(MOTOR_SPEED);
-    TickType_t deadline = xTaskGetTickCount() + pdMS_TO_TICKS(MOTOR_TIMEOUT_MS);
-
-    while (xTaskGetTickCount() < deadline) {
-        if (irTriggered) {
-            int pos = irPosition;
-            irTriggered = false;
-            if (pos == target) {
-                motorStop();
-                currentPosition = pos;
-                vTaskDelay(pdMS_TO_TICKS(MOTOR_ROTATE_MS));
-                pushResponse("ROTATE_DONE", pos);
-                return;
-            }
-        }
-        vTaskDelay(pdMS_TO_TICKS(5));
-    }
-    motorStop();
-    pushResponse("ERROR", 0);
+static void doGoHome() {
+    reportHome(motionGoHome());
 }
 
 void taskRealtime(void* pvParameters) {
     ESP32PWM::allocateTimer(0);
     ESP32PWM::allocateTimer(1);
 
-    pinMode(PIN_MOTOR_IN1, OUTPUT);
-    pinMode(PIN_MOTOR_IN2, OUTPUT);
-    ledcSetup(MOTOR_LEDC_CHANNEL, MOTOR_LEDC_FREQ, MOTOR_LEDC_BITS);
-    ledcAttachPin(PIN_MOTOR_ENA, MOTOR_LEDC_CHANNEL);
-    motorStop();
-
-    pinMode(PIN_IR_PLASTIC, INPUT);
-    pinMode(PIN_IR_GLASS, INPUT);
-    pinMode(PIN_IR_PAPER, INPUT);
-    pinMode(PIN_IR_METAL, INPUT);
-    attachInterrupt(digitalPinToInterrupt(PIN_IR_PLASTIC), irPLASTIC, FALLING);
-    attachInterrupt(digitalPinToInterrupt(PIN_IR_GLASS), irGLASS, FALLING);
-    attachInterrupt(digitalPinToInterrupt(PIN_IR_PAPER), irPAPER, FALLING);
-    attachInterrupt(digitalPinToInterrupt(PIN_IR_METAL), irMETAL, FALLING);
+    motionBegin();      // LEDC motor + pinMode/ISR cho 4 chân IR + đọc vị trí đầu
 
     servoKnock.setPeriodHertz(50);
     servoKnock.attach(PIN_SERVO_KNOCK, 500, 2400);
@@ -126,16 +90,18 @@ void taskRealtime(void* pvParameters) {
     servoDoor.attach(PIN_SERVO_DOOR, 500, 2400);
     servoDoor.write(DOOR_CLOSE_ANGLE);
 
+    // Tự về HOME NGAY KHI KHỞI ĐỘNG — không đợi lệnh đầu tiên từ Pi. Quan trọng
+    // sau brownout/crash giữa chu kỳ: ống có thể đang đứng trên một ngăn khác.
+    reportHome(motionHomeOnBoot());
+
     Command_t cmd;
     for (;;) {
         if (xQueueReceive(commandQueue, &cmd, portMAX_DELAY) == pdTRUE) {
-            if (strcmp(cmd.cmd, "KNOCK") == 0) {
-                doKnock(cmd.param);
-            } else if (strcmp(cmd.cmd, "ROTATE") == 0) {
-                doRotate(cmd.param);
-            } else if (strcmp(cmd.cmd, "DISCHARGE") == 0) {
-                doDischarge();
-            }
+            if      (strcmp(cmd.cmd, "KNOCK")     == 0) doKnock(cmd.param);
+            else if (strcmp(cmd.cmd, "ROTATE")    == 0) doRotate(cmd.param);
+            else if (strcmp(cmd.cmd, "DISCHARGE") == 0) doDischarge();
+            else if (strcmp(cmd.cmd, "HOME")      == 0) doGoHome();
+            else                                        pushResponse("ERROR", 1);
         }
     }
 }

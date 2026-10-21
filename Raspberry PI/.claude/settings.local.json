@@ -15,7 +15,8 @@
       "Read(//c/Users/NVVuong/.platformio/platforms/espressif32/**)",
       "Read(//c/Users/NVVuong/.platformio/platforms/**)",
       "Read(//c/Users/NVVuong/.platformio/**)",
-      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\.platformio\" | Select-Object Name, LastWriteTime)"
+      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\.platformio\" | Select-Object Name, LastWriteTime)",
+      "PowerShell(& \"C:\\\\Users\\\\NVVuong\\\\.platformio\\\\penv\\\\Scripts\\\\platformio.exe\" device list)"
     ],
     "additionalDirectories": [
       "d:\\Projects\\WasteDetector\\Raspberry PI"
