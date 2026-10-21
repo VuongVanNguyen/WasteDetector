@@ -1,0 +1,6 @@
+# Ảnh do pi_camera_classifier.py sinh ra (Mode 1-4) — dataset có thể tới hàng trăm MB
+dataset/
+dataset_raw/
+camera_last.jpg
+roi_frame.jpg
+exposure_check.jpg

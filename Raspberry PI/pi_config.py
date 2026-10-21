@@ -40,16 +40,70 @@ AUDIO_SEQUENCE_MARGIN_S = 0.8  # thu thêm ngoài KNOCK_COUNT × KNOCK_INTERVAL_
 MIN_CONFIDENCE       = 0.35    # dưới ngưỡng: VẪN xả vào ngăn khả năng nhất, chỉ đánh dấu
                                # "không chắc chắn" trong log — không giữ vật lại trong ống
 
+# Pi chờ phản hồi ESP32. ESP32 LUÔN trả lời (ROTATE_DONE/READY hoặc ERROR) — các
+# timeout này chỉ bắt trường hợp mất UART, nên phải DÀI HƠN ca xấu nhất của motor:
+# ROTATE có thể phải về HOME trước rồi mới đi tiếp (tới 4 đoạn 90° × MOTOR_TIMEOUT_MS
+# 5s trong config.h, chưa kể lùi dò IR hỏng). Timeout ngắn hơn thì Pi bỏ chu kỳ trong
+# khi ống vẫn đang quay → vật nằm lại ở ngăn đích, ESP32 không bao giờ push READY.
+ROTATE_TIMEOUT_S     = 30.0
+DISCHARGE_TIMEOUT_S  = 5.0     # cửa: DOOR_HOLD_MS + DOOR_SETTLE_MS = 2s
+READY_TIMEOUT_S      = 30.0    # về HOME sau xả — cùng lý do với ROTATE_TIMEOUT_S
+
+# ============================================================
+# Fusion (pi_classifier_fusion.py)
+# ============================================================
+AUDIO_WEIGHT             = 0.4    # ưu tiên camera: model AI đã đo 97% trên Pi, FFT chưa calibrate
+CAMERA_WEIGHT            = 0.6    # AUDIO_WEIGHT + CAMERA_WEIGHT nên = 1.0
+FUSION_BONUS_AGREE       = 0.10
+FUSION_PENALTY_DISAGREE  = 0.15
+AUDIO_PER_KNOCK_MIN_CONF = 0.20   # ngưỡng loại nhiễu khi gộp nhiều lần gõ
+FALLBACK_WASTE_TYPE      = WASTE_GLASS  # mic + camera cùng hỏng. Thủy tinh = HOME: không
+                                        # quay ống → không mòn cơ cấu, không rủi ro xoắn dây
+
 # ============================================================
 # Camera
 # ============================================================
-CAMERA_ID = 0   # 0 = mặc định (USB webcam hoặc Pi Camera qua libcamera)
+CAMERA_BACKEND    = "auto"       # "auto" = picamera2 nếu có, không thì OpenCV VideoCapture
+                                 # "picamera2" | "opencv" = ép một backend
+CAMERA_ID         = 0            # picamera2: camera_num; OpenCV: index VideoCapture
+CAMERA_RESOLUTION = (1280, 960)  # (w, h) khung chụp — ROI cắt từ khung này. Đổi độ phân
+                                 # giải thì camera_roi.json tự co giãn theo (có lưu kích thước khung)
+
+# Phơi sáng KHÓA dưới LED — đo 1 lần: `python3 pi_camera_classifier.py 4`.
+# None = để AE/AWB tự động (tạm thời, trước khi đo): camera phải chờ
+# CAMERA_AUTO_SETTLE_S mỗi lần chụp và ảnh thay đổi theo vật. Phải khóa TRƯỚC khi chụp
+# dataset — đổi phơi sáng sau đó là ảnh train không còn khớp ảnh vận hành.
+CAMERA_EXPOSURE_US   = None      # int, µs   (ExposureTime)
+CAMERA_ANALOGUE_GAIN = None      # float     (AnalogueGain)
+CAMERA_COLOUR_GAINS  = None      # (red, blue) (ColourGains)
+CAMERA_AUTO_SETTLE_S = 1.0       # chờ AE/AWB hội tụ dưới LED khi CHƯA khóa phơi sáng
+
+CAMERA_CAPTURE_TIMEOUT_S = 2.0   # mỗi lần lấy frame (picamera2)
+CAMERA_CAPTURE_RETRIES   = 3     # frame lỗi / đen → chụp lại tối đa bấy nhiêu lần
+CAMERA_BLACK_MEAN        = 8.0   # độ sáng trung bình (0-255) dưới mức này = frame đen
+CAMERA_OPENCV_FLUSH      = 5     # OpenCV: bỏ bấy nhiêu frame cũ trong buffer driver
+
+# Model YOLO26n-cls (OpenVINO IR) — thư mục tương đối so với thư mục Raspberry PI/
+CAMERA_MODEL_DIR       = "models/yolo26n_cls_openvino"
+CAMERA_INFER_THREADS   = 4       # 4 lõi Cortex-A72
+CAMERA_INFER_TIMEOUT_S = 2.0     # quá hạn → hủy inference, trả (WASTE_NONE, 0.0)
+
+# Lớp của model (metadata.yaml) → mã WASTE_*. Gộp theo TÊN, không theo chỉ số: train
+# lại đổi thứ tự lớp vẫn đúng. Mọi lớp của model PHẢI có mặt ở đây, thiếu là camera
+# bị tắt lúc khởi động. Nhựa = HDPE + PET: xác suất CỘNG lại, không lấy lớp cao nhất.
+CAMERA_CLASS_MAP = {
+    "CARTON": WASTE_PAPER,
+    "GLASS":  WASTE_GLASS,
+    "HDPE":   WASTE_PLASTIC,
+    "PET":    WASTE_PLASTIC,
+    "METAL":  WASTE_METAL,
+}
 
 # LED 1W chiếu sáng lúc chụp: Pi GPIO → MOSFET IRLZ44N → LED (xem CLAUDE.md)
 LED_PIN      = 17     # số BCM — chân vật lý 11. Tránh 14/15 (UART ESP32)
-LED_SETTLE_S = 0.1    # bật LED rồi chờ bấy nhiêu mới chụp: ≥ 3 frame ở 30fps để frame
-                      # chụp được phơi sáng TRỌN dưới LED. Chỉ đủ khi camera KHÓA phơi
-                      # sáng; để AE tự động thì phải ~0.5-1s.
+LED_SETTLE_S = 0.1    # bật LED rồi chờ bấy nhiêu mới chụp. Chỉ đủ khi camera KHÓA phơi
+                      # sáng; chưa khóa thì dùng CAMERA_AUTO_SETTLE_S. Frame lấy bằng
+                      # flush=True nên luôn bắt đầu phơi sáng SAU lúc này.
 
 # ============================================================
 # Audio

@@ -40,13 +40,15 @@ FLOW 1 CHU KỲ (_process_waste) — đồng bộ với CLAUDE.md
   5. confidence < MIN_CONFIDENCE → VẪN tiếp tục bước 6, chỉ đánh dấu
      uncertain=True (log WARNING "Không chắc chắn — xả vào <ngăn>").
      Xem mục "VẬT KHÔNG NHẬN DIỆN ĐƯỢC".
-  6. send_rotate(waste_type) → chờ ROTATE_DONE (timeout 10s).
+  6. send_rotate(waste_type) → chờ ROTATE_DONE (ROTATE_TIMEOUT_S).
      Rác Thủy tinh: ngăn xả = HOME, ESP32 không quay, vẫn trả ROTATE_DONE.
-  7. send_discharge() → chờ DISCHARGE_DONE (timeout 5s).
+  7. send_discharge() → chờ DISCHARGE_DONE (DISCHARGE_TIMEOUT_S).
      → log kết quả ngay (cửa đã đóng).
   8. ESP32 TỰ quay về HOME rồi push READY — Pi KHÔNG ra lệnh HOME.
-     Chờ READY (timeout ~15s) trước khi coi chu kỳ là xong.
+     Chờ READY (READY_TIMEOUT_S) trước khi coi chu kỳ là xong.
      DISCHARGE_DONE KHÔNG phải "xong chu kỳ".
+  Timeout ROTATE/READY là 30s, không phải 10-15s: ESP32 LUÔN trả lời (DONE
+  hoặc ERROR), timeout chỉ bắt mất UART — xem chú thích trong pi_config.
 
 
 XỬ LÝ EVENT TỪ ESP32 (_on_esp32_event — reader thread)
@@ -55,8 +57,8 @@ XỬ LÝ EVENT TỪ ESP32 (_on_esp32_event — reader thread)
   KNOCK_DONE       → _knock_done_events[seq-1].set()  (bỏ qua seq ngoài khoảng)
   ROTATE_DONE      → _rotate_done_event.set()
   DISCHARGE_DONE   → _discharge_done_event.set()
-  READY            → _ready_event.set()               ← CHƯA CÓ, cần thêm
-  ERROR            → lưu code (vd self._last_error) + set một Event lỗi để
+  READY            → _ready_event.set(); gỡ chốt FAULT phía Pi (xem dưới)
+  ERROR            → lưu code (self._last_error) + set _error_event để
                      worker đang chờ ROTATE/DISCHARGE/READY thức dậy ngay,
                      không phải đợi hết timeout.
 
@@ -67,6 +69,10 @@ XỬ LÝ EVENT TỪ ESP32 (_on_esp32_event — reader thread)
         tháo xoắn dây và mở khóa. Pi phải DỪNG HẲN (không nhận chu kỳ mới),
         log lỗi ở mức ERROR, và KHÔNG BAO GIỜ tự thử lại / gửi HOME
         — thử lại chính là thứ cuốn đứt dây.
+        Chốt phía Pi chỉ gỡ khi ESP32 push READY: ESP32 chỉ push READY khi
+        về HOME THÀNH CÔNG, mà engine đang FAULT thì từ chối quay — tức READY
+        chỉ có thể đến sau khi người đã gỡ chốt (jog + 'f', hoặc quay tay về
+        Thủy tinh rồi reset). Pi không gửi gì trong suốt quá trình đó.
     INVALID_CMD — lỗi lập trình phía Pi: log, hủy chu kỳ.
 
 
@@ -102,29 +108,53 @@ Chạy:
   python3 main_controller.py
 """
 
+from __future__ import annotations
+
+import logging
 import threading
+import time
 from threading import Event
 
 from pi_config import (
-    KNOCK_COUNT, MIN_CONFIDENCE,
-    WASTE_NAMES, WASTE_NONE,
+    KNOCK_COUNT, KNOCK_INTERVAL_S, AUDIO_SEQUENCE_MARGIN_S, MIN_CONFIDENCE,
+    ROTATE_TIMEOUT_S, DISCHARGE_TIMEOUT_S, READY_TIMEOUT_S,
+    WASTE_NAMES,
 )
 from pi_communication import ESP32Comm
 from pi_audio_classifier import ESP32AudioClassifier
 from pi_camera_classifier import CameraClassifier
-from pi_classifier_fusion import ClassifierFusion
+from pi_classifier_fusion import ClassifierFusion, STRATEGY_FALLBACK
+
+log = logging.getLogger("main")
+
+# Chờ KNOCK_DONE cuối: cả chuỗi gõ + đuôi thu âm + ~1s biên UART (spec bước 2d)
+_KNOCK_TIMEOUT_S = KNOCK_COUNT * KNOCK_INTERVAL_S + AUDIO_SEQUENCE_MARGIN_S + 1.0
+_FALLBACK_ALERT_STREAK = 2   # FALLBACK liên tiếp từ lần này → cảnh báo kiểm tra mic/camera
+
+
+class MechanicalError(Exception):
+    """ESP32 báo ERROR / im lặng quá timeout khi chờ ROTATE / DISCHARGE / READY."""
 
 
 class WasteDetectorSystem:
     """Điều phối toàn bộ flow phân loại rác."""
 
     def __init__(self):
+        self._running = False
+        self._worker: threading.Thread | None = None
+
         self._knock_done_events: list[Event] = []
         self._rotate_done_event = Event()
         self._discharge_done_event = Event()
+        self._ready_event = Event()
+        self._error_event = Event()
         self._object_event = Event()
+        self._last_error: str | None = None
+        self._faulted = False          # ESP32 đã báo MOTION_FAULT — xem docstring
+        self._fallback_streak = 0
 
-        self.esp32 = ESP32Comm(on_event=self._on_esp32_event)
+        self.esp32 = ESP32Comm()
+        self.esp32.on_event = self._on_esp32_event
         self.audio = ESP32AudioClassifier()
         self.camera_classifier = CameraClassifier()
         self.fusion = ClassifierFusion()
@@ -140,9 +170,10 @@ class WasteDetectorSystem:
             self._object_event.set()
 
         elif name == "KNOCK_DONE":
-            seq = event.get("seq", 1) - 1
-            if 0 <= seq < len(self._knock_done_events):
-                self._knock_done_events[seq].set()
+            seq = event.get("seq")
+            events = self._knock_done_events
+            if isinstance(seq, int) and 1 <= seq <= len(events):
+                events[seq - 1].set()
 
         elif name == "ROTATE_DONE":
             self._rotate_done_event.set()
@@ -150,65 +181,127 @@ class WasteDetectorSystem:
         elif name == "DISCHARGE_DONE":
             self._discharge_done_event.set()
 
+        elif name == "READY":
+            if self._faulted:
+                log.warning("[ESP32] READY sau MOTION_FAULT — ESP32 đã được gỡ chốt, nhận vật trở lại")
+                self._faulted = False
+            self._ready_event.set()
+
         elif name == "ERROR":
-            code = event.get("code", "UNKNOWN")
-            print(f"[ESP32] ERROR: {code}")
+            code = str(event.get("code", "UNKNOWN"))
+            self._last_error = code
+            if code == "MOTION_FAULT":
+                self._faulted = True
+                log.error("[ESP32] MOTION_FAULT — engine quay đã KHÓA. Cần người: tháo xoắn dây "
+                          "rồi gỡ chốt. Pi ngừng nhận chu kỳ mới và KHÔNG tự thử lại.")
+            else:
+                log.error("[ESP32] ERROR: %s", code)
+            self._error_event.set()
+
+    # ----------------------------------------------------------
+    # Chờ ESP32
+    # ----------------------------------------------------------
+
+    def _arm(self, *events: Event):
+        """Xóa event chờ + lỗi cũ. Gọi TRƯỚC khi gửi lệnh — event có thể về rất nhanh."""
+        self._last_error = None
+        self._error_event.clear()
+        for e in events:
+            e.clear()
+
+    def _wait_esp32(self, done: Event, timeout_s: float, what: str):
+        """Chờ `done`; ERROR từ ESP32 hoặc hết giờ → MechanicalError ngay."""
+        deadline = time.monotonic() + timeout_s
+        while not done.is_set():
+            if self._error_event.is_set():
+                raise MechanicalError(f"ESP32 báo {self._last_error} khi chờ {what}")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise MechanicalError(f"không nhận {what} sau {timeout_s:.0f}s (mất UART?)")
+            done.wait(min(0.05, remaining))
 
     # ----------------------------------------------------------
     # Main processing loop
     # ----------------------------------------------------------
 
     def _process_waste(self):
-        """Xử lý 1 vật thể từ đầu đến cuối."""
-        print("[System] Đã phát hiện vật thể")
+        """Xử lý 1 vật thể từ đầu đến cuối — spec "FLOW 1 CHU KỲ" đầu file."""
+        t_start = time.monotonic()
+        log.info("[System] Phát hiện vật thể — bắt đầu chu kỳ")
 
-        # Gõ + thu âm LIÊN TỤC cả chuỗi — xem spec bước 2 đầu file
-        audio_results = []
+        # 2. Gõ + thu âm LIÊN TỤC cả chuỗi
         self._knock_done_events = [Event() for _ in range(KNOCK_COUNT)]
+        audio_ok = self.audio.start_sequence(KNOCK_COUNT)      # TRƯỚC send_knock
+        if not audio_ok:
+            log.warning("[System] Không mở được mic — phân loại chỉ bằng camera")
+        try:
+            self.esp32.send_knock(KNOCK_COUNT)
+            if not self._knock_done_events[-1].wait(timeout=_KNOCK_TIMEOUT_S):
+                log.warning("[System] Không nhận KNOCK_DONE %d/%d sau %.1fs — dùng phần âm thanh đã thu",
+                            KNOCK_COUNT, KNOCK_COUNT, _KNOCK_TIMEOUT_S)
+            audio_results = self.audio.finish_sequence() if audio_ok else []   # cả khi timeout
+        except BaseException:
+            self.audio.abort_sequence()
+            raise
 
-        # TODO: audio_ok = self.audio.start_sequence(KNOCK_COUNT)  ← TRƯỚC send_knock
-        self.esp32.send_knock(KNOCK_COUNT)
+        # 3. Camera — vật đã nằm yên; LED chỉ sáng lúc chụp
+        cam_result = self.camera_classifier.classify()
 
-        for i, done_event in enumerate(self._knock_done_events):
-            done_event.wait(timeout=5)
-        # TODO: chỉ chờ Event lần gõ cuối, rồi (kể cả khi timeout):
-        # audio_results = self.audio.finish_sequence() if audio_ok else []
+        # 4. Fusion — luôn ra 1 ngăn thật
+        waste_type, confidence, strategy = self.fusion.decide_detailed(audio_results, cam_result)
+        if strategy == STRATEGY_FALLBACK:
+            self._fallback_streak += 1
+            if self._fallback_streak >= _FALLBACK_ALERT_STREAK:
+                log.warning("[System] %d chu kỳ liên tiếp mic VÀ camera cùng hỏng — kiểm tra mic/camera",
+                            self._fallback_streak)
+        else:
+            self._fallback_streak = 0
 
-        # Chụp ảnh
-        # cam_result = self.camera_classifier.classify()
+        # 5. Không chắc chắn vẫn xả — vật nằm lại trong ống là máy kẹt
+        uncertain = confidence < MIN_CONFIDENCE
+        if uncertain:
+            log.warning("[System] Không chắc chắn (%.0f%%) — vẫn xả vào %s",
+                        confidence * 100, WASTE_NAMES[waste_type])
 
-        # Fusion
-        # waste_type, confidence = self.fusion.decide(audio_results, cam_result)
-        waste_type, confidence = WASTE_NONE, 0.0  # placeholder
-
-        # TODO: LỖI THỜI — bỏ nhánh này. Không bao giờ giữ vật lại trong ống;
-        # confidence thấp vẫn xả, chỉ đánh dấu "không chắc chắn" (spec bước 5).
-        if waste_type == WASTE_NONE or confidence < MIN_CONFIDENCE:
-            print("[System] Không nhận diện được")
-            return
-
-        # Xoay ống
-        self._rotate_done_event.clear()
+        # 6. Xoay ống. Lỗi ở đây → KHÔNG xả: vị trí ống không chắc, vật có thể rơi ngoài ngăn
+        if self._faulted:
+            raise MechanicalError("ESP32 đang MOTION_FAULT — không gửi ROTATE, vật còn trong ống")
+        self._arm(self._rotate_done_event)
         self.esp32.send_rotate(waste_type)
-        self._rotate_done_event.wait(timeout=10)
+        try:
+            self._wait_esp32(self._rotate_done_event, ROTATE_TIMEOUT_S, "ROTATE_DONE")
+        except MechanicalError as e:
+            raise MechanicalError(f"{e} — KHÔNG xả, vật còn trong ống") from None
 
-        # Thả rác
-        self._discharge_done_event.clear()
+        # 7. Xả. READY cũng phải clear TRƯỚC lệnh này: ESP32 push READY ngay sau DISCHARGE_DONE
+        self._arm(self._discharge_done_event, self._ready_event)
         self.esp32.send_discharge()
-        self._discharge_done_event.wait(timeout=5)
+        self._wait_esp32(self._discharge_done_event, DISCHARGE_TIMEOUT_S, "DISCHARGE_DONE")
+        log.info("[System] Đã xả: %s (độ tin cậy %.0f%%%s, %s)", WASTE_NAMES[waste_type],
+                 confidence * 100, ", KHÔNG CHẮC" if uncertain else "", strategy)
 
-        # Hoàn thành
-        print(f"[System] Phân loại: {WASTE_NAMES[waste_type]} "
-              f"(độ tin cậy {confidence:.1%})")
+        # 8. ESP32 tự về HOME → READY. DISCHARGE_DONE chưa phải xong chu kỳ.
+        try:
+            self._wait_esp32(self._ready_event, READY_TIMEOUT_S, "READY")
+        except MechanicalError as e:
+            raise MechanicalError(f"{e} — vật ĐÃ xả, nhưng ống chưa về HOME") from None
+        log.info("[System] Chu kỳ xong (%.1fs) — sẵn sàng vật tiếp theo", time.monotonic() - t_start)
 
     def _worker_loop(self):
         while self._running:
-            self._object_event.wait()
+            if not self._object_event.wait(timeout=0.5):
+                continue
             self._object_event.clear()
+            if self._faulted:
+                log.error("[System] Bỏ qua vật mới: ESP32 đang MOTION_FAULT — cần người gỡ chốt")
+                continue
             try:
                 self._process_waste()
-            except Exception as e:
-                print(f"[ERROR] {e}")
+            except MechanicalError as e:
+                log.error("[System] LỖI CƠ CẤU: %s. Hủy chu kỳ — cần người kiểm tra.", e)
+            except Exception:
+                log.exception("[System] Lỗi không mong đợi — hủy chu kỳ")
+                self.audio.abort_sequence()
 
     # ----------------------------------------------------------
     # Lifecycle
@@ -217,23 +310,24 @@ class WasteDetectorSystem:
     def run(self):
         self._running = True
 
-        print("=" * 50)
-        print("  MÁY PHÂN LOẠI RÁC THÔNG MINH")
-        print("  Khởi tạo hệ thống...")
-        print("=" * 50)
+        log.info("=" * 50)
+        log.info("  MÁY PHÂN LOẠI RÁC THÔNG MINH")
+        log.info("=" * 50)
 
         if not self.esp32.connect():
-            print("[WARN] Không kết nối được ESP32 — chạy ở chế độ hạn chế")
+            log.warning("[System] Không kết nối được ESP32 — chạy ở chế độ hạn chế")
+        if not self.camera_classifier.available:
+            log.warning("[System] Camera classifier KHÔNG khả dụng — phân loại chỉ bằng âm thanh")
 
-        worker = threading.Thread(target=self._worker_loop, daemon=True)
-        worker.start()
+        self._worker = threading.Thread(target=self._worker_loop, name="worker", daemon=True)
+        self._worker.start()
 
-        print("\n✓ Hệ thống sẵn sàng. Bỏ rác vào ống để bắt đầu.\n")
+        log.info("✓ Hệ thống sẵn sàng. Bỏ rác vào ống để bắt đầu.")
 
         try:
             # join có timeout để Ctrl+C (KeyboardInterrupt) vẫn tới được main thread
-            while worker.is_alive():
-                worker.join(timeout=1.0)
+            while self._worker.is_alive():
+                self._worker.join(timeout=1.0)
         except KeyboardInterrupt:
             pass
         finally:
@@ -241,9 +335,19 @@ class WasteDetectorSystem:
 
     def _shutdown(self):
         self._running = False
-        self.esp32.disconnect()
-        print("[System] Đã tắt.")
+        if self._worker is not None:
+            self._worker.join(timeout=2.0)   # chu kỳ đang chạy dở thì không chờ hết
+        for name, fn in (("audio", self.audio.abort_sequence),
+                         ("camera", self.camera_classifier.close),
+                         ("esp32", self.esp32.disconnect)):
+            try:
+                fn()
+            except Exception as e:
+                log.error("[System] Lỗi khi tắt %s: %s", name, e)
+        log.info("[System] Đã tắt.")
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO,
+                        format="%(asctime)s [%(levelname)s] %(message)s")
     WasteDetectorSystem().run()
