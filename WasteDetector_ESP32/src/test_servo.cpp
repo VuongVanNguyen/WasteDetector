@@ -18,6 +18,9 @@
 //         với 'k'/'d' thì lỗi nằm ở ESP32Servo; không chạy thì lỗi phần cứng.
 //   'x' → detach: servo mất tín hiệu, trục phải LỎNG khi xoay tay
 //   'r' → attach lại và về góc nghỉ: trục phải CỨNG, ghì lại tay
+//   '+' / '-' → nhích servo đang chọn ±5°;  '>' / '<' → ±1°. In ra góc hiện tại.
+//         Dùng để DÒ GÓC: nhích tới vị trí đúng rồi chép số vào config.h
+//         (KNOCK_REST/STRIKE_ANGLE, DOOR_CLOSE/OPEN_ANGLE).
 //   Bấm phím bất kỳ để dừng 'p' / 'l' giữa chừng.
 //
 // Điều chỉnh các góc/thời gian trong config.h, sau đó flash lại.
@@ -28,9 +31,6 @@
 
 static Servo servoKnock;
 static Servo servoDoor;
-
-static constexpr int SERVO_MIN_US = 600;
-static constexpr int SERVO_MAX_US = 2400;
 
 // LEDC thô cho lệnh 'l' — kênh 7 (timer 3), không đụng timer 0/1 của ESP32Servo
 static constexpr int RAW_LEDC_CH   = 7;
@@ -121,6 +121,15 @@ static void sweep() {
     Serial.println("[SWEEP] Xong, ve goc nghi.");
 }
 
+static void jog(int delta) {
+    Servo& s = selServo();
+    if (!s.attached()) { Serial.println("[JOG] Servo chua attach — bam 'r' truoc."); return; }
+    // 600-2400us / 180deg = 10us moi do -> read() tra dung goc da write(), khong troi
+    int a = constrain(s.read() + delta, 0, 180);
+    s.write(a);
+    Serial.printf("[JOG] %s → %d° (%dus)\n", selName(), a, s.readMicroseconds());
+}
+
 static void pinToggleTest() {
     int pin = selPin();
     selServo().detach();
@@ -166,7 +175,8 @@ static void rawLedcTest() {
 
 static void printMenu() {
     Serial.printf("\n--- 'k'=knock 'd'=door 'a'=ca 2 | chan doan [%s]: '1'/'2'=chon "
-                  "'i'=info 's'=quet 'p'=thu day 'l'=LEDC tho 'x'=detach 'r'=attach ---\n",
+                  "'i'=info 's'=quet 'p'=thu day 'l'=LEDC tho 'x'=detach 'r'=attach "
+                  "'+'/'-'=±5° '>'/'<'=±1° ---\n",
                   selName());
 }
 
@@ -220,6 +230,10 @@ void loop() {
         case 's': sweep(); break;
         case 'p': pinToggleTest(); break;
         case 'l': rawLedcTest(); break;
+        case '+': case '=': jog(+5); break;
+        case '-': case '_': jog(-5); break;
+        case '>': case '.': jog(+1); break;
+        case '<': case ',': jog(-1); break;
 
         case 'x':
             selServo().detach();

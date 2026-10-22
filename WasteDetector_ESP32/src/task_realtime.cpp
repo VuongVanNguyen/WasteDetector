@@ -83,11 +83,11 @@ void taskRealtime(void* pvParameters) {
     motionBegin();      // LEDC motor + pinMode/ISR cho 4 chân IR + đọc vị trí đầu
 
     servoKnock.setPeriodHertz(50);
-    servoKnock.attach(PIN_SERVO_KNOCK, 500, 2400);
+    servoKnock.attach(PIN_SERVO_KNOCK, SERVO_MIN_US, SERVO_MAX_US);
     servoKnock.write(KNOCK_REST_ANGLE);
 
     servoDoor.setPeriodHertz(50);
-    servoDoor.attach(PIN_SERVO_DOOR, 500, 2400);
+    servoDoor.attach(PIN_SERVO_DOOR, SERVO_MIN_US, SERVO_MAX_US);
     servoDoor.write(DOOR_CLOSE_ANGLE);
 
     // Tự về HOME NGAY KHI KHỞI ĐỘNG — không đợi lệnh đầu tiên từ Pi. Quan trọng

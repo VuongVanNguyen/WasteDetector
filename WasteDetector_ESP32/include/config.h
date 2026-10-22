@@ -60,18 +60,27 @@
 // ============================================================
 #define KNOCK_INTERVAL_MS       700     // period between knock starts (ms)
                                         // PHAI >= DWELL + SETTLE + margin
-#define KNOCK_STRIKE_ANGLE      90      // SG90 strike angle (deg)
-#define KNOCK_REST_ANGLE        12      // SG90 rest angle (deg)
-                                        // KHONG de 0: xung 500-600us thuong vuot gioi han
-                                        // co khi cua SG90 -> servo stall lien tuc khi "nghi".
-#define KNOCK_DWELL_MS          300     // time held at strike position
+#define KNOCK_REST_ANGLE        100     // SG90 rest angle (deg)
+#define KNOCK_STRIKE_ANGLE      180     // SG90 strike angle (deg)
+                                        // 180deg = xung 2400us: neu servo ru/nong khi go
+                                        // la dang ghi vao gioi han co khi -> ha xuong ~170.
+#define KNOCK_DWELL_MS         300     // time held at strike position
                                         // SG90 ~0.1s/60deg khong tai => 90deg can >=150ms;
                                         // co tai phai du hao. Qua ngan = servo bi goi ve
                                         // khi chua di het hanh trinh.
 #define KNOCK_SETTLE_MS         250     // time for servo to return to rest
 
-#define DOOR_OPEN_ANGLE         0       // MG90S open angle (deg) — inverted mount
-#define DOOR_CLOSE_ANGLE        90      // MG90S closed angle (deg) — inverted mount
+#define SERVO_MIN_US            600     // xung ung voi 0deg — DUNG CHUNG cho test_servo
+#define SERVO_MAX_US            2400    // xung ung voi 180deg  va firmware production, de
+                                        // goc do bang 'test_servo' khop goc chay that
+
+// Servo cua nghi (dong) o 90deg, mo ve 0 hoac 180 tuy chieu lap.
+// Lap nguoc chieu -> chi doi DOOR_DIR, khong sua goc.
+//   +1 = vung ve phia 180deg | -1 = vung ve phia 0deg
+#define DOOR_DIR                (-1)    // MG90S: chieu MO cua
+#define DOOR_SWING_DEG          90      // bien do mo cua (deg)
+#define DOOR_CLOSE_ANGLE        90                                      // MG90S closed (deg)
+#define DOOR_OPEN_ANGLE         (90 + DOOR_DIR * DOOR_SWING_DEG)        // 180 hoac 0
 #define DOOR_HOLD_MS            1500    // how long door stays open
 #define DOOR_SETTLE_MS          500     // settle time after door closes
 
